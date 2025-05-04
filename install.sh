@@ -44,10 +44,41 @@ else
     HTTP_PORT=8080
 fi
 
+# --- Ask for RPC endpoints ---
+echo -e "\n🌐 ${YELLOW}Enter L1 RPC endpoint (e.g. Ankr, Alchemy, or public node):${RESET}"
+read -p "🔗 ETHEREUM_HOSTS [default: https://ethereum-sepolia-rpc.publicnode.com]: " ETHEREUM_HOSTS
+ETHEREUM_HOSTS=${ETHEREUM_HOSTS:-"https://ethereum-sepolia-rpc.publicnode.com"}
+
+echo -e "\n🛰️  ${YELLOW}Enter Beacon API endpoint:${RESET}"
+read -p "📡 L1_CONSENSUS_HOST_URLS [default: https://ethereum-sepolia-beacon-api.publicnode.com]: " L1_CONSENSUS_HOST_URLS
+L1_CONSENSUS_HOST_URLS=${L1_CONSENSUS_HOST_URLS:-"https://ethereum-sepolia-beacon-api.publicnode.com"}
+
 # --- Update System ---
 echo -e "\n🔧 ${BLUE}${BOLD}Updating system and installing prerequisites...${RESET}"
 sudo apt update && sudo apt upgrade -y
-sudo apt install -y curl jq git ufw docker.io docker-compose
+sudo apt install -y curl jq git ufw apt-transport-https ca-certificates software-properties-common
+
+# --- Fix for Ubuntu 24.04 containerd conflict ---
+echo -e "\n🔧 ${BLUE}${BOLD}Resolving Docker containerd conflicts...${RESET}"
+sudo apt-get remove -y containerd || true
+sudo apt-get purge -y containerd || true
+
+# --- Install Docker ---
+echo -e "\n🐳 ${BLUE}${BOLD}Installing Docker...${RESET}"
+sudo mkdir -p /etc/apt/keyrings
+curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /etc/apt/keyrings/docker.gpg
+
+echo \
+  "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] \
+  https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" | \
+  sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
+
+sudo apt update -y
+sudo apt install -y docker-ce docker-ce-cli containerd.io docker-compose-plugin
+
+# --- Enable Docker ---
+sudo systemctl enable docker
+sudo systemctl restart docker
 
 # --- Configure Firewall ---
 echo -e "\n🛡️  ${BLUE}${BOLD}Configuring UFW Firewall...${RESET}"
@@ -57,27 +88,29 @@ sudo ufw allow "${TCP_UDP_PORT}"/udp comment 'Aztec UDP'
 sudo ufw allow "${HTTP_PORT}"/tcp comment 'Aztec RPC'
 sudo ufw --force enable
 
-# --- Install Aztec CLI (Optional Tooling) ---
+# --- Install Aztec CLI (optional for tooling) ---
 echo -e "\n🔩 ${BLUE}${BOLD}Installing Aztec CLI tools...${RESET}"
 curl -s https://install.aztec.network > aztec_install.sh
 echo "y" | bash aztec_install.sh
 echo 'export PATH="$HOME/.aztec/bin:$PATH"' >> ~/.bashrc
 export PATH="$HOME/.aztec/bin:$PATH"
 
-# --- Setup Directory ---
+# --- Setup Aztec Sequencer Directory ---
 echo -e "\n📁 ${BLUE}${BOLD}Setting up Aztec Sequencer files...${RESET}"
 mkdir -p ~/aztec-sequencer
 cd ~/aztec-sequencer
 
 # --- Create .env ---
-echo -e "${CYAN}→ Writing .env file...${RESET}"
+echo -e "${CYAN}→ Creating .env file...${RESET}"
 cat <<EOF > .env
 VALIDATOR_PRIVATE_KEY=${ETH_PRIVATE_KEY}
 P2P_IP=${SERVER_IP}
+ETHEREUM_HOSTS=${ETHEREUM_HOSTS}
+L1_CONSENSUS_HOST_URLS=${L1_CONSENSUS_HOST_URLS}
 EOF
 
-# --- Docker Compose ---
-echo -e "${CYAN}→ Writing docker-compose.yml...${RESET}"
+# --- Create docker-compose.yml ---
+echo -e "${CYAN}→ Creating docker-compose.yml...${RESET}"
 cat <<EOF > docker-compose.yml
 version: '3.8'
 
@@ -86,8 +119,8 @@ services:
     image: aztecprotocol/aztec:0.85.0-alpha-testnet.5
     container_name: aztec-sequencer
     environment:
-      ETHEREUM_HOSTS: "https://ethereum-sepolia-rpc.publicnode.com"
-      L1_CONSENSUS_HOST_URLS: "https://ethereum-sepolia-beacon-api.publicnode.com"
+      ETHEREUM_HOSTS: \${ETHEREUM_HOSTS}
+      L1_CONSENSUS_HOST_URLS: \${L1_CONSENSUS_HOST_URLS}
       DATA_DIRECTORY: /data
       VALIDATOR_PRIVATE_KEY: \${VALIDATOR_PRIVATE_KEY}
       P2P_IP: \${P2P_IP}
@@ -103,11 +136,11 @@ services:
     restart: unless-stopped
 EOF
 
-# --- Start Node ---
-echo -e "\n🚀 ${BLUE}${BOLD}Starting Aztec Sequencer Node via Docker...${RESET}"
+# --- Start Docker Container ---
+echo -e "\n🚀 ${BLUE}${BOLD}Starting Aztec Sequencer Node via Docker Compose...${RESET}"
 docker compose up -d
 
-# --- Wait for Port ---
+# --- Wait for Node to Respond ---
 echo -e "\n⏳ ${YELLOW}${BOLD}Waiting for Aztec node to respond on port ${HTTP_PORT}...${RESET}"
 ATTEMPTS=0
 MAX_ATTEMPTS=60
@@ -134,6 +167,8 @@ echo -e "${BOLD}Node Info:${RESET}"
 echo -e "🌐 IP Address   : ${GREEN}$SERVER_IP${RESET}"
 echo -e "📡 P2P Port     : ${YELLOW}$TCP_UDP_PORT${RESET}"
 echo -e "🧠 RPC Port     : ${YELLOW}$HTTP_PORT${RESET}"
+echo -e "🔗 L1 RPC       : ${CYAN}$ETHEREUM_HOSTS${RESET}"
+echo -e "📡 Beacon URL   : ${CYAN}$L1_CONSENSUS_HOST_URLS${RESET}"
 echo
 echo -e "${BOLD}Commands:${RESET}"
 echo -e "📄 View logs     : ${CYAN}cd ~/aztec-sequencer && docker-compose logs -f${RESET}"
