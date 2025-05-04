@@ -1,3 +1,5 @@
+[Complete Aztec Node Setup Script Below]
+
 #!/bin/bash
 
 set -e
@@ -10,25 +12,35 @@ BLUE="\033[1;34m"
 YELLOW="\033[1;33m"
 CYAN="\033[1;36m"
 RED="\033[1;31m"
+MAGENTA="\033[1;35m"
 
 AZTEC_DIR="$HOME/aztec-sequencer"
 CONFIG_FILE="$AZTEC_DIR/config.json"
 ENV_FILE="$AZTEC_DIR/.env"
 
-# --- MENU ---
+# --- MENU HEADER ---
 clear
 echo -e "${BLUE}${BOLD}"
-echo "╔══════════════════════════════════════════════════════╗"
-echo "║              FZ AMIR • AZTEC NODE TOOL               ║"
-echo "╚══════════════════════════════════════════════════════╝"
+echo "╔══════════════════════════════════════════════════════════════╗"
+echo "║                  🚀 FZ AMIR • AZTEC NODE TOOL                ║"
+echo "╚══════════════════════════════════════════════════════════════╝"
 echo -e "${RESET}"
-echo "1) Install Aztec Sequencer Node"
-echo "2) View Aztec Node Logs"
-echo "3) Reinstall Node (auto use saved config)"
-echo "4) Exit"
-read -p "Select an option [1-4]: " CHOICE
 
-if [[ "$CHOICE" == "2" ]]; then
+# --- MENU OPTIONS ---
+echo -e "${CYAN}${BOLD}Please choose an option below:${RESET}"
+echo -e "${YELLOW}"
+echo "  [1] 📦  Install Aztec Sequencer Node"
+echo "  [2] 📄  View Aztec Node Logs"
+echo "  [3] ♻️   Reinstall Node (using saved config)"
+echo "  [4] 🔎  Show L2 Block Info + Sync Proof"
+echo "  [5] ❌  Exit"
+echo -e "${RESET}"
+read -p "🔧 Enter your choice [1-5]: " CHOICE
+
+if [[ "$CHOICE" == "5" ]]; then
+  echo -e "${YELLOW}👋 Exiting. Have a great day!${RESET}"
+  exit 0
+elif [[ "$CHOICE" == "2" ]]; then
   if [[ -d "$AZTEC_DIR" ]]; then
     echo -e "${CYAN}📄 Streaming logs from $AZTEC_DIR ... Press Ctrl+C to exit.${RESET}"
     cd "$AZTEC_DIR"
@@ -38,11 +50,24 @@ if [[ "$CHOICE" == "2" ]]; then
   fi
   exit 0
 elif [[ "$CHOICE" == "4" ]]; then
-  echo -e "${YELLOW}👋 Exiting. Nothing done.${RESET}"
-  exit 0
-fi
+  echo -e "\n🔍 ${CYAN}Fetching latest L2 block info...${RESET}"
+  HTTP_PORT=$(jq -r .HTTP_PORT "$CONFIG_FILE" 2>/dev/null || echo 8080)
 
-if [[ "$CHOICE" == "3" ]]; then
+  BLOCK=$(curl -s -X POST -H 'Content-Type: application/json' \
+    -d '{"jsonrpc":"2.0","method":"node_getL2Tips","params":[],"id":67}' \
+    http://localhost:$HTTP_PORT | jq -r ".result.proven.number")
+
+  if [[ -z "$BLOCK" || "$BLOCK" == "null" ]]; then
+    echo -e "❌ ${RED}Failed to fetch block number.${RESET}"
+  else
+    echo -e "✅ ${GREEN}Current L2 Block Number: ${BOLD}$BLOCK${RESET}"
+    echo -e "🔗 ${CYAN}Sync Proof:${RESET}"
+    curl -s -X POST -H 'Content-Type: application/json' \
+      -d "{\"jsonrpc\":\"2.0\",\"method\":\"node_getArchiveSiblingPath\",\"params\":[\"$BLOCK\",\"$BLOCK\"],\"id\":67}" \
+      http://localhost:$HTTP_PORT | jq
+  fi
+  exit 0
+elif [[ "$CHOICE" == "3" ]]; then
   if [[ ! -f "$CONFIG_FILE" || ! -f "$ENV_FILE" ]]; then
     echo -e "${RED}❌ No saved config found. Run full install first (Option 1).${RESET}"
     exit 1
@@ -56,8 +81,7 @@ if [[ "$CHOICE" == "3" ]]; then
   exit 0
 fi
 
-# --- Full Install ---
-
+# --- Option 1: Full Install ---
 SERVER_IP=$(curl -s https://ipinfo.io/ip || echo "127.0.0.1")
 echo -e "📡 ${YELLOW}Detected server IP: ${GREEN}${BOLD}$SERVER_IP${RESET}"
 read -p "🌐 Use this IP? (y/n): " use_detected_ip
@@ -67,9 +91,8 @@ fi
 
 read -p "🔑 Enter your ETH private key (no 0x): " ETH_PRIVATE_KEY
 
-echo -e "
-📦 ${YELLOW}Default ports are 40400 (P2P) and 8080 (RPC)${RESET}"
-read -p "⚙️  Do you want to use custom ports? (y/n): " use_custom_ports
+echo -e "\n📦 ${YELLOW}Default ports are 40400 (P2P) and 8080 (RPC)${RESET}"
+read -p "⚙️  Use custom ports? (y/n): " use_custom_ports
 
 if [[ "$use_custom_ports" == "y" || "$use_custom_ports" == "Y" ]]; then
     read -p "📍 Enter P2P port [default: 40400]: " TCP_UDP_PORT
@@ -106,9 +129,8 @@ ETHEREUM_HOSTS=$ETHEREUM_HOSTS
 L1_CONSENSUS_HOST_URLS=$L1_CONSENSUS_HOST_URLS
 EOF
 
-# --- System Setup ---
-echo -e "
-🔧 Updating system and installing Docker..."
+# --- Install Dependencies ---
+echo -e "\n🔧 ${YELLOW}${BOLD}Setting up system dependencies...${RESET}"
 sudo apt update && sudo apt install -y curl jq git ufw apt-transport-https ca-certificates software-properties-common
 sudo apt-get remove -y containerd || true
 sudo apt-get purge -y containerd || true
@@ -128,7 +150,7 @@ sudo ufw allow "$TCP_UDP_PORT"/udp
 sudo ufw allow "$HTTP_PORT"/tcp
 sudo ufw --force enable
 
-# --- Docker Compose ---
+# --- Docker Compose Setup ---
 cat <<EOF > "$AZTEC_DIR/docker-compose.yml"
 services:
   node:
@@ -157,33 +179,18 @@ cd "$AZTEC_DIR"
 docker compose up -d
 
 # --- Health Check ---
-echo -e "
-⏳ Waiting for Aztec node to come online on port $HTTP_PORT..."
+echo -e "\n⏳ ${YELLOW}Waiting for Aztec node to come online...${RESET}"
 MAX_ATTEMPTS=180
 ATTEMPTS=0
 
 while (( ATTEMPTS < MAX_ATTEMPTS )); do
   if curl -s --max-time 2 http://localhost:$HTTP_PORT > /dev/null; then
-    echo -e "
-✅ ${GREEN}${BOLD}Aztec node is live on port ${HTTP_PORT}!${RESET}"
+    echo -e "\n✅ ${GREEN}${BOLD}Aztec node is live on port ${HTTP_PORT}!${RESET}"
     break
   fi
 
   if ! docker ps | grep -q aztec-sequencer; then
-    echo -e "
-❌ ${RED}Container crashed. Cleaning and restarting...${RESET}"
-    docker compose down -v
-    rm -rf /home/my-node/node
-    docker compose up -d
-    ATTEMPTS=0
-    sleep 10
-    continue
-  fi
-
-  LOG_PATH="$(docker inspect --format='{{.LogPath}}' aztec-sequencer 2>/dev/null)"
-  if [[ -f "$LOG_PATH" ]] && grep -q "failed to be hashed to the block inHash" "$LOG_PATH"; then
-    echo -e "
-⚠️  Detected sync error. Cleaning corrupted state..."
+    echo -e "\n❌ ${RED}Container crashed. Restarting...${RESET}"
     docker compose down -v
     rm -rf /home/my-node/node
     docker compose up -d
@@ -195,14 +202,3 @@ while (( ATTEMPTS < MAX_ATTEMPTS )); do
   ((ATTEMPTS++))
   echo -e "🔄 Attempt $ATTEMPTS/$MAX_ATTEMPTS... waiting 5s"
   sleep 5
-done
-
-if (( ATTEMPTS >= MAX_ATTEMPTS )); then
-  echo -e "
-❌ Node failed to respond after $MAX_ATTEMPTS attempts."
-  echo -e "🧪 Use: cd $AZTEC_DIR && docker-compose logs -f"
-  exit 1
-fi
-
-echo -e "
-🎉 ${GREEN}${BOLD}Installation complete. Node is validating!${RESET}"
