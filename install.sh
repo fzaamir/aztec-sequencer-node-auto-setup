@@ -11,13 +11,36 @@ YELLOW="\033[1;33m"
 CYAN="\033[1;36m"
 RED="\033[1;31m"
 
-# --- HEADER ---
+AZTEC_DIR="$HOME/aztec-sequencer"
+
+# --- MENU ---
 clear
 echo -e "${BLUE}${BOLD}"
 echo "╔══════════════════════════════════════════════════════╗"
-echo "║              FZ AMIR • AZTEC NODE INSTALLER          ║"
+echo "║              FZ AMIR • AZTEC NODE TOOL               ║"
 echo "╚══════════════════════════════════════════════════════╝"
 echo -e "${RESET}"
+echo "1) Install Aztec Sequencer Node"
+echo "2) View Aztec Node Logs"
+echo "3) Exit"
+read -p "Select an option [1-3]: " CHOICE
+
+if [[ "$CHOICE" == "2" ]]; then
+  if [[ -d "$AZTEC_DIR" ]]; then
+    echo -e "${CYAN}📄 Streaming logs from $AZTEC_DIR ... Press Ctrl+C to exit.${RESET}"
+    cd "$AZTEC_DIR"
+    docker-compose logs -f
+  else
+    echo -e "${RED}❌ Aztec node directory not found: $AZTEC_DIR${RESET}"
+    exit 1
+  fi
+  exit 0
+elif [[ "$CHOICE" != "1" ]]; then
+  echo -e "${YELLOW}👋 Exiting. Nothing done.${RESET}"
+  exit 0
+fi
+
+# ------------------- INSTALL BEGINS ---------------------
 
 # --- IP Detection ---
 SERVER_IP=$(curl -s https://ipinfo.io/ip || echo "127.0.0.1")
@@ -97,8 +120,8 @@ export PATH="$HOME/.aztec/bin:$PATH"
 
 # --- Setup Aztec Sequencer Directory ---
 echo -e "\n📁 ${BLUE}${BOLD}Setting up Aztec Sequencer files...${RESET}"
-mkdir -p ~/aztec-sequencer
-cd ~/aztec-sequencer
+mkdir -p "$AZTEC_DIR"
+cd "$AZTEC_DIR"
 
 # --- Create .env ---
 echo -e "${CYAN}→ Creating .env file...${RESET}"
@@ -177,7 +200,7 @@ done
 
 if (( ATTEMPTS >= MAX_ATTEMPTS )); then
   echo -e "\n❌ ${RED}${BOLD}Node failed to respond after $MAX_ATTEMPTS attempts.${RESET}"
-  echo -e "🧪 Run ${BOLD}docker-compose logs -f${RESET} in ~/aztec-sequencer to debug."
+  echo -e "🧪 Run ${BOLD}docker-compose logs -f${RESET} in $AZTEC_DIR to debug."
   exit 1
 fi
 
@@ -194,9 +217,9 @@ echo -e "🔗 L1 RPC       : ${CYAN}$ETHEREUM_HOSTS${RESET}"
 echo -e "📡 Beacon URL   : ${CYAN}$L1_CONSENSUS_HOST_URLS${RESET}"
 echo
 echo -e "${BOLD}Commands:${RESET}"
-echo -e "📄 View logs     : ${CYAN}cd ~/aztec-sequencer && docker-compose logs -f${RESET}"
-echo -e "🛑 Stop node     : ${CYAN}cd ~/aztec-sequencer && docker compose down -v${RESET}"
-echo -e "🔄 Restart node  : ${CYAN}cd ~/aztec-sequencer && docker restart aztec-sequencer${RESET}"
+echo -e "📄 View logs     : ${CYAN}cd $AZTEC_DIR && docker-compose logs -f${RESET}"
+echo -e "🛑 Stop node     : ${CYAN}cd $AZTEC_DIR && docker compose down -v${RESET}"
+echo -e "🔄 Restart node  : ${CYAN}cd $AZTEC_DIR && docker restart aztec-sequencer${RESET}"
 echo
 echo -e "🎉 ${GREEN}${BOLD}Installation complete! Your Aztec Sequencer Node is running.${RESET}"
 echo
