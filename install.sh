@@ -1,7 +1,6 @@
 #!/bin/bash
 
 set -e
-
 export DEBIAN_FRONTEND=noninteractive
 
 echo "🚀 Starting Aztec Validator One-Click Setup"
@@ -12,7 +11,7 @@ sudo apt-get update -y && sudo apt-get upgrade -y
 sudo apt-get install -y \
   curl iptables build-essential git wget lz4 jq make gcc nano automake autoconf tmux htop \
   nvme-cli libgbm1 pkg-config libssl-dev libleveldb-dev tar clang bsdmainutils ncdu unzip \
-  libleveldb-dev ca-certificates gnupg
+  libleveldb-dev ca-certificates gnupg software-properties-common screen
 
 # 2. Install Docker
 echo "🐳 Installing Docker..."
@@ -36,8 +35,10 @@ sudo docker run hello-world || true
 
 # 3. Install Aztec CLI
 echo "🔧 Installing Aztec CLI tools..."
-bash -i <(curl -s https://install.aztec.network)
-exec bash
+bash <(curl -s https://install.aztec.network)
+
+# Add Aztec CLI to PATH
+export PATH="$HOME/.aztec/bin:$PATH"
 
 # 4. Gather Required Info
 echo "🧠 Please enter the following info:"
