@@ -112,8 +112,6 @@ EOF
 # --- Create docker-compose.yml ---
 echo -e "${CYAN}→ Creating docker-compose.yml...${RESET}"
 cat <<EOF > docker-compose.yml
-version: '3.8'
-
 services:
   node:
     image: aztecprotocol/aztec:0.85.0-alpha-testnet.5
@@ -140,23 +138,48 @@ EOF
 echo -e "\n🚀 ${BLUE}${BOLD}Starting Aztec Sequencer Node via Docker Compose...${RESET}"
 docker compose up -d
 
-# --- Wait for Node to Respond ---
-echo -e "\n⏳ ${YELLOW}${BOLD}Waiting for Aztec node to respond on port ${HTTP_PORT}...${RESET}"
+# --- Health Check and Recovery ---
+echo -e "\n⏳ ${YELLOW}${BOLD}Waiting for Aztec node to respond on port ${HTTP_PORT} (up to 15 minutes)...${RESET}"
+MAX_ATTEMPTS=180
 ATTEMPTS=0
-MAX_ATTEMPTS=60
-until curl -s --max-time 2 http://localhost:${HTTP_PORT} > /dev/null; do
-  ((ATTEMPTS++))
-  if [ $ATTEMPTS -ge $MAX_ATTEMPTS ]; then
-    echo -e "\n❌ ${RED}${BOLD}Node failed to respond after $MAX_ATTEMPTS attempts.${RESET}"
-    echo -e "🧪 Run ${BOLD}docker-compose logs -f${RESET} in ~/aztec-sequencer to debug."
-    exit 1
+
+while (( ATTEMPTS < MAX_ATTEMPTS )); do
+  if curl -s --max-time 2 http://localhost:${HTTP_PORT} > /dev/null; then
+    echo -e "\n✅ ${GREEN}${BOLD}Aztec node is live on port ${HTTP_PORT}!${RESET}"
+    break
   fi
+
+  if ! docker ps | grep -q aztec-sequencer; then
+    echo -e "\n❌ ${RED}${BOLD}Aztec container stopped. Attempting recovery...${RESET}"
+    docker compose down -v
+    rm -rf /home/my-node/node
+    docker compose up -d
+    ATTEMPTS=0
+    sleep 10
+    continue
+  fi
+
+  LOG_PATH="$(docker inspect --format='{{.LogPath}}' aztec-sequencer 2>/dev/null)"
+  if [[ -f "$LOG_PATH" ]] && grep -q "failed to be hashed to the block inHash" "$LOG_PATH"; then
+    echo -e "\n⚠️  ${RED}${BOLD}Detected sync hash error in logs. Cleaning corrupted state...${RESET}"
+    docker compose down -v
+    rm -rf /home/my-node/node
+    docker compose up -d
+    ATTEMPTS=0
+    sleep 10
+    continue
+  fi
+
+  ((ATTEMPTS++))
   echo -e "🔄 Attempt $ATTEMPTS/$MAX_ATTEMPTS... waiting 5s"
   sleep 5
 done
 
-# --- Success Banner ---
-echo -e "\n${GREEN}${BOLD}✅ Node is LIVE and responding on port ${HTTP_PORT}!${RESET}"
+if (( ATTEMPTS >= MAX_ATTEMPTS )); then
+  echo -e "\n❌ ${RED}${BOLD}Node failed to respond after $MAX_ATTEMPTS attempts.${RESET}"
+  echo -e "🧪 Run ${BOLD}docker-compose logs -f${RESET} in ~/aztec-sequencer to debug."
+  exit 1
+fi
 
 # --- Summary ---
 echo -e "\n${BLUE}${BOLD}══════════════════════════════════════════════════════"
