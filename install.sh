@@ -66,13 +66,24 @@ screen -S aztec -dm bash -c "aztec start --node --archiver --sequencer \
   --p2p.p2pIp $SERVER_IP \
   --p2p.maxTxPoolSize 1000000000"
 
-echo -e "\n⏳ \033[1;33mWaiting for Aztec node to start on port 8080...\033[0m"
-until curl -s http://localhost:8080 > /dev/null; do
-  echo -e "🔄 Still waiting... \033[2m(trying again in 5s)\033[0m"
+# 6.1 Wait for node to respond
+echo -e "\n⏳ \033[1;33mWaiting for Aztec node to become responsive on port 8080...\033[0m"
+
+ATTEMPTS=0
+MAX_ATTEMPTS=60
+
+until curl -s --max-time 2 http://localhost:8080 > /dev/null; do
+  ((ATTEMPTS++))
+  if [ $ATTEMPTS -ge $MAX_ATTEMPTS ]; then
+    echo -e "\n❌ \033[1;31mNode failed to start after $MAX_ATTEMPTS attempts (~5 minutes).\033[0m"
+    echo -e "💡 Run \033[1m'screen -r aztec'\033[0m to view logs and troubleshoot."
+    exit 1
+  fi
+  echo -e "🔄 Attempt $ATTEMPTS/$MAX_ATTEMPTS: Waiting 5s..."
   sleep 5
 done
 
-echo -e "✅ \033[1;32mNode is up and running!\033[0m You can check logs with: \033[1m'screen -r aztec'\033[0m"
+echo -e "✅ \033[1;32mNode is live and responding on port 8080!\033[0m Use \033[1m'screen -r aztec'\033[0m to view logs."
 
 # 7. Instructions for Next Steps
 echo -e "\n🎯 \033[1;34mNext Steps:\033[0m"
