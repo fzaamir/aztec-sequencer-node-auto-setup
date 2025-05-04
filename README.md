@@ -32,7 +32,7 @@ A one-click installer to deploy and run an Aztec validator node on any Ubuntu VP
 > **Copy and paste this command into your terminal:**
 
 ```bash
-bash <(curl -s https://raw.githubusercontent.com/<your-username>/aztec-validator-auto-setup/main/install.sh)
+bash <(curl -s https://raw.githubusercontent.com/fzaamir/aztec-validator-auto-setup/main/install.sh)
 ```
 
 Replace `<your-username>` with your actual GitHub username after you upload the script.
