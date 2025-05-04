@@ -1,5 +1,3 @@
-[Complete Aztec Node Setup Script Below]
-
 #!/bin/bash
 
 set -e
