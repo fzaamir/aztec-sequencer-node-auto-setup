@@ -37,10 +37,8 @@ Deploy and run an Aztec sequencer validator node on **Ubuntu 20.04 or 22.04** us
 Run this in your terminal:
 
 ```bash
-bash <(curl -s https://raw.githubusercontent.com/<your-username>/aztec-validator-auto-setup/main/install.sh)
+bash <(curl -s https://raw.githubusercontent.com/fzaamir/aztec-validator-auto-setup/main/install.sh)
 ```
-
-> Replace `<your-username>` with your GitHub username
 
 ---
 
