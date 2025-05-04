@@ -2,11 +2,13 @@
 
 set -e
 
+export DEBIAN_FRONTEND=noninteractive
+
 echo "🚀 Starting Aztec Validator One-Click Setup"
 
 # 1. Update & Install System Dependencies
 echo "📦 Updating and installing system packages..."
-sudo apt-get update && sudo apt-get upgrade -y
+sudo apt-get update -y && sudo apt-get upgrade -y
 sudo apt-get install -y \
   curl iptables build-essential git wget lz4 jq make gcc nano automake autoconf tmux htop \
   nvme-cli libgbm1 pkg-config libssl-dev libleveldb-dev tar clang bsdmainutils ncdu unzip \
@@ -26,7 +28,7 @@ echo \
   https://download.docker.com/linux/ubuntu $(. /etc/os-release && echo "$VERSION_CODENAME") stable" | \
   sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
 
-sudo apt-get update
+sudo apt-get update -y
 sudo apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
 sudo systemctl enable docker
 sudo systemctl restart docker
@@ -48,11 +50,11 @@ echo "🖥️ Detected server IP: $SERVER_IP"
 
 # 5. Configure Firewall
 echo "🛡️ Setting up UFW firewall..."
-sudo ufw allow 22
-sudo ufw allow ssh
-sudo ufw allow 40400
-sudo ufw allow 8080
-sudo ufw --force enable
+yes | sudo ufw allow 22
+yes | sudo ufw allow ssh
+yes | sudo ufw allow 40400
+yes | sudo ufw allow 8080
+yes | sudo ufw --force enable
 
 # 6. Start Node in screen session
 echo "🌀 Launching Aztec node inside 'screen'..."
