@@ -35,6 +35,24 @@ echo "  [5] ❌  Exit"
 echo -e "${RESET}"
 read -p "🔧 Enter your choice [1-5]: " CHOICE
 
+# --- Fetch Latest Image Tag ---
+fetch_latest_image_tag() {
+  echo -e "${CYAN}🔍 Checking for latest Aztec Docker image...${RESET}"
+  LATEST_TAG=$(curl -s "https://registry.hub.docker.com/v2/repositories/aztecprotocol/aztec/tags?page_size=100" \
+    | jq -r '.results[].name' \
+    | grep 'alpha-testnet' \
+    | sort -Vr \
+    | head -n 1)
+
+  if [[ -z "$LATEST_TAG" ]]; then
+    echo -e "${RED}❌ Failed to fetch latest tag. Falling back to default: 0.85.0-alpha-testnet.5${RESET}"
+    LATEST_TAG="0.85.0-alpha-testnet.5"
+  else
+    echo -e "${GREEN}✅ Found latest tag: ${BOLD}$LATEST_TAG${RESET}"
+  fi
+  echo "$LATEST_TAG"
+}
+
 if [[ "$CHOICE" == "5" ]]; then
   echo -e "${YELLOW}👋 Exiting. Have a great day!${RESET}"
   exit 0
@@ -70,16 +88,21 @@ elif [[ "$CHOICE" == "3" ]]; then
     echo -e "${RED}❌ No saved config found. Run full install first (Option 1).${RESET}"
     exit 1
   fi
+
   echo -e "${CYAN}♻️  Reinstalling Aztec Node using saved config...${RESET}"
   cd "$AZTEC_DIR"
+  IMAGE_TAG=$(fetch_latest_image_tag)
+  docker pull aztecprotocol/aztec:$IMAGE_TAG
   docker compose down -v
   rm -rf /home/my-node/node
+  sudo apt update -y && sudo apt upgrade -y
   docker compose up -d
-  echo -e "${GREEN}✅ Node restarted with saved config.${RESET}"
+  echo -e "${GREEN}✅ Node restarted with latest image and saved config.${RESET}"
   exit 0
 fi
 
 # --- Option 1: Full Install ---
+IMAGE_TAG=$(fetch_latest_image_tag)
 SERVER_IP=$(curl -s https://ipinfo.io/ip || echo "127.0.0.1")
 echo -e "📡 ${YELLOW}Detected server IP: ${GREEN}${BOLD}$SERVER_IP${RESET}"
 read -p "🌐 Use this IP? (y/n): " use_detected_ip
@@ -152,7 +175,7 @@ sudo ufw --force enable
 cat <<EOF > "$AZTEC_DIR/docker-compose.yml"
 services:
   node:
-    image: aztecprotocol/aztec:0.85.0-alpha-testnet.5
+    image: aztecprotocol/aztec:$IMAGE_TAG
     container_name: aztec-sequencer
     environment:
       ETHEREUM_HOSTS: \${ETHEREUM_HOSTS}
@@ -200,3 +223,4 @@ while (( ATTEMPTS < MAX_ATTEMPTS )); do
   ((ATTEMPTS++))
   echo -e "🔄 Attempt $ATTEMPTS/$MAX_ATTEMPTS... waiting 5s"
   sleep 5
+done
