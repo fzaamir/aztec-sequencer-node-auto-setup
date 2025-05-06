@@ -45,11 +45,10 @@ fetch_latest_image_tag() {
     | head -n 1)
 
   if [[ -z "$TAG" ]]; then
-    echo -e "${RED}❌ Failed to fetch latest tag from Docker Hub.${RESET}"
-    echo ""
+    echo -e "${RED}❌ Failed to fetch latest tag from Docker Hub.${RESET}" >&2
     return 1
   else
-    echo -e "${GREEN}✅ Found latest tag: ${BOLD}$TAG${RESET}"
+    echo -e "${GREEN}✅ Found latest tag: ${BOLD}$TAG${RESET}" >&2
     echo "$TAG"
   fi
 }
@@ -97,7 +96,8 @@ elif [[ "$CHOICE" == "3" ]]; then
     echo -e "${RED}❌ Cannot continue without a valid image tag.${RESET}"
     exit 1
   fi
-  docker pull aztecprotocol/aztec:$IMAGE_TAG
+  echo -e "${CYAN}📥 Pulling aztecprotocol/aztec:$IMAGE_TAG ...${RESET}"
+  docker pull "aztecprotocol/aztec:$IMAGE_TAG"
   docker compose down -v
   rm -rf /home/my-node/node
   sudo apt update -y && sudo apt upgrade -y
@@ -122,7 +122,8 @@ fi
 
 read -p "🔑 Enter your ETH private key (no 0x): " ETH_PRIVATE_KEY
 
-echo -e "\n📦 ${YELLOW}Default ports are 40400 (P2P) and 8080 (RPC)${RESET}"
+echo -e "
+📦 ${YELLOW}Default ports are 40400 (P2P) and 8080 (RPC)${RESET}"
 read -p "⚙️  Use custom ports? (y/n): " use_custom_ports
 
 if [[ "$use_custom_ports" == "y" || "$use_custom_ports" == "Y" ]]; then
@@ -161,7 +162,8 @@ L1_CONSENSUS_HOST_URLS=$L1_CONSENSUS_HOST_URLS
 EOF
 
 # --- Install Dependencies ---
-echo -e "\n🔧 ${YELLOW}${BOLD}Setting up system dependencies...${RESET}"
+echo -e "
+🔧 ${YELLOW}${BOLD}Setting up system dependencies...${RESET}"
 sudo apt update && sudo apt install -y curl jq git ufw apt-transport-https ca-certificates software-properties-common
 sudo apt-get remove -y containerd || true
 sudo apt-get purge -y containerd || true
@@ -210,18 +212,21 @@ cd "$AZTEC_DIR"
 docker compose up -d
 
 # --- Health Check ---
-echo -e "\n⏳ ${YELLOW}Waiting for Aztec node to come online...${RESET}"
+echo -e "
+⏳ ${YELLOW}Waiting for Aztec node to come online...${RESET}"
 MAX_ATTEMPTS=180
 ATTEMPTS=0
 
 while (( ATTEMPTS < MAX_ATTEMPTS )); do
   if curl -s --max-time 2 http://localhost:$HTTP_PORT > /dev/null; then
-    echo -e "\n✅ ${GREEN}${BOLD}Aztec node is live on port ${HTTP_PORT}!${RESET}"
+    echo -e "
+✅ ${GREEN}${BOLD}Aztec node is live on port ${HTTP_PORT}!${RESET}"
     break
   fi
 
   if ! docker ps | grep -q aztec-sequencer; then
-    echo -e "\n❌ ${RED}Container crashed. Restarting...${RESET}"
+    echo -e "
+❌ ${RED}Container crashed. Restarting...${RESET}"
     docker compose down -v
     rm -rf /home/my-node/node
     docker compose up -d
