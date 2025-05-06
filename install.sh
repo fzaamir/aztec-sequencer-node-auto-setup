@@ -40,7 +40,7 @@ fetch_latest_image_tag() {
   echo -e "${CYAN}🔍 Checking for latest Aztec Docker image...${RESET}"
   TAG=$(curl -s "https://registry.hub.docker.com/v2/repositories/aztecprotocol/aztec/tags?page_size=100" \
     | jq -r '.results[].name' \
-    | grep 'alpha-testnet' \
+    | grep '^0\.[0-9]*\.[0-9]*-alpha-testnet\.[0-9]*$' \
     | sort -Vr \
     | head -n 1)
 
