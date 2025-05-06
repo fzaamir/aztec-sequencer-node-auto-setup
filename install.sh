@@ -35,7 +35,6 @@ echo "  [5] ❌  Exit"
 echo -e "${RESET}"
 read -p "🔧 Enter your choice [1-5]: " CHOICE
 
-
 if [[ "$CHOICE" == "5" ]]; then
   echo -e "${YELLOW}👋 Exiting. Have a great day!${RESET}"
   exit 0
@@ -75,11 +74,7 @@ elif [[ "$CHOICE" == "3" ]]; then
   echo -e "${CYAN}♻️  Reinstalling Aztec Node using saved config...${RESET}"
   cd "$AZTEC_DIR"
   IMAGE_TAG="0.85.0-alpha-testnet.8"
-  if [[ -z "$IMAGE_TAG" ]]; then
-    echo -e "${RED}❌ Cannot continue without a valid image tag.${RESET}"
-    exit 1
-  fi
-  echo -e "${CYAN}📥 Pulling aztecprotocol/aztec:$IMAGE_TAG ...${RESET}"
+  echo -e "${CYAN}👅 Pulling aztecprotocol/aztec:$IMAGE_TAG ...${RESET}"
   docker pull "aztecprotocol/aztec:$IMAGE_TAG"
   docker compose down -v
   rm -rf /home/my-node/node
@@ -91,22 +86,19 @@ fi
 
 # --- Option 1: Full Install ---
 IMAGE_TAG="0.85.0-alpha-testnet.8"
-if [[ -z "$IMAGE_TAG" ]]; then
-  echo -e "${RED}❌ Cannot continue without a valid image tag.${RESET}"
-  exit 1
-fi
-
 SERVER_IP=$(curl -s https://ipinfo.io/ip || echo "127.0.0.1")
-echo -e "📡 ${YELLOW}Detected server IP: ${GREEN}${BOLD}$SERVER_IP${RESET}"
+echo -e "📱 ${YELLOW}Detected server IP: ${GREEN}${BOLD}$SERVER_IP${RESET}"
 read -p "🌐 Use this IP? (y/n): " use_detected_ip
 if [[ "$use_detected_ip" != "y" && "$use_detected_ip" != "Y" ]]; then
     read -p "🔧 Enter your VPS/Server IP: " SERVER_IP
 fi
 
-read -p "🔑 Enter your ETH private key (no 0x): " ETH_PRIVATE_KEY
+read -s -p "🔑 Enter your ETH private key (no 0x): " ETH_PRIVATE_KEY
+echo
+echo "$ETH_PRIVATE_KEY" | gpg --batch --yes --symmetric --cipher-algo AES256 --passphrase '' -o "$AZTEC_DIR/ethkey.gpg"
+unset ETH_PRIVATE_KEY
 
-echo -e "
-📦 ${YELLOW}Default ports are 40400 (P2P) and 8080 (RPC)${RESET}"
+echo -e "\n📦 ${YELLOW}Default ports are 40400 (P2P) and 8080 (RPC)${RESET}"
 read -p "⚙️  Use custom ports? (y/n): " use_custom_ports
 
 if [[ "$use_custom_ports" == "y" || "$use_custom_ports" == "Y" ]]; then
@@ -122,10 +114,9 @@ fi
 read -p "🔗 ETHEREUM_HOSTS [default: https://ethereum-sepolia-rpc.publicnode.com]: " ETHEREUM_HOSTS
 ETHEREUM_HOSTS=${ETHEREUM_HOSTS:-"https://ethereum-sepolia-rpc.publicnode.com"}
 
-read -p "📡 L1_CONSENSUS_HOST_URLS [default: https://ethereum-sepolia-beacon-api.publicnode.com]: " L1_CONSENSUS_HOST_URLS
+read -p "📱 L1_CONSENSUS_HOST_URLS [default: https://ethereum-sepolia-beacon-api.publicnode.com]: " L1_CONSENSUS_HOST_URLS
 L1_CONSENSUS_HOST_URLS=${L1_CONSENSUS_HOST_URLS:-"https://ethereum-sepolia-beacon-api.publicnode.com"}
 
-# Save config
 mkdir -p "$AZTEC_DIR"
 cat <<EOF > "$CONFIG_FILE"
 {
@@ -138,16 +129,15 @@ cat <<EOF > "$CONFIG_FILE"
 EOF
 
 cat <<EOF > "$ENV_FILE"
-VALIDATOR_PRIVATE_KEY=$ETH_PRIVATE_KEY
+VALIDATOR_PRIVATE_KEY_COMMAND=gpg --batch --yes --passphrase '' -d $AZTEC_DIR/ethkey.gpg
 P2P_IP=$SERVER_IP
 ETHEREUM_HOSTS=$ETHEREUM_HOSTS
 L1_CONSENSUS_HOST_URLS=$L1_CONSENSUS_HOST_URLS
 EOF
 
 # --- Install Dependencies ---
-echo -e "
-🔧 ${YELLOW}${BOLD}Setting up system dependencies...${RESET}"
-sudo apt update && sudo apt install -y curl jq git ufw apt-transport-https ca-certificates software-properties-common
+echo -e "\n🔧 ${YELLOW}${BOLD}Setting up system dependencies...${RESET}"
+sudo apt update && sudo apt install -y curl jq git ufw apt-transport-https ca-certificates software-properties-common gnupg
 sudo apt-get remove -y containerd || true
 sudo apt-get purge -y containerd || true
 
@@ -176,7 +166,7 @@ services:
       ETHEREUM_HOSTS: \${ETHEREUM_HOSTS}
       L1_CONSENSUS_HOST_URLS: \${L1_CONSENSUS_HOST_URLS}
       DATA_DIRECTORY: /data
-      VALIDATOR_PRIVATE_KEY: \${VALIDATOR_PRIVATE_KEY}
+      VALIDATOR_PRIVATE_KEY: "\$(\${VALIDATOR_PRIVATE_KEY_COMMAND})"
       P2P_IP: \${P2P_IP}
       LOG_LEVEL: debug
     entrypoint: >
@@ -195,21 +185,18 @@ cd "$AZTEC_DIR"
 docker compose up -d
 
 # --- Health Check ---
-echo -e "
-⏳ ${YELLOW}Waiting for Aztec node to come online...${RESET}"
+echo -e "\n⏳ ${YELLOW}Waiting for Aztec node to come online...${RESET}"
 MAX_ATTEMPTS=180
 ATTEMPTS=0
 
 while (( ATTEMPTS < MAX_ATTEMPTS )); do
   if curl -s --max-time 2 http://localhost:$HTTP_PORT > /dev/null; then
-    echo -e "
-✅ ${GREEN}${BOLD}Aztec node is live on port ${HTTP_PORT}!${RESET}"
+    echo -e "\n✅ ${GREEN}${BOLD}Aztec node is live on port ${HTTP_PORT}!${RESET}"
     break
   fi
 
   if ! docker ps | grep -q aztec-sequencer; then
-    echo -e "
-❌ ${RED}Container crashed. Restarting...${RESET}"
+    echo -e "\n❌ ${RED}Container crashed. Restarting...${RESET}"
     docker compose down -v
     rm -rf /home/my-node/node
     docker compose up -d
@@ -224,14 +211,12 @@ while (( ATTEMPTS < MAX_ATTEMPTS )); do
 done
 
 # --- Continuous Log Monitor with Error Recovery ---
-echo -e "
-🛠️  ${CYAN}Monitoring logs for critical errors...${RESET}"
+echo -e "\n🛠️  ${CYAN}Monitoring logs for critical errors...${RESET}"
 LOG_CHECK_INTERVAL=10
 while true; do
   ERROR_DETECTED=$(docker logs aztec-sequencer 2>&1 | tail -n 200 | grep -F "Error: ERROR: world-state:block_stream Error processing block stream: Error: Obtained L1 to L2 messages failed to be hashed to the block inHash")
   if [[ -n "$ERROR_DETECTED" ]]; then
-    echo -e "
-${RED}🔥 Critical error detected in logs. Restarting node and clearing state...${RESET}"
+    echo -e "\n${RED}🔥 Critical error detected in logs. Restarting node and clearing state...${RESET}"
     docker compose down -v
     rm -rf /root/.aztec/alpha-testnet
     docker compose up -d
