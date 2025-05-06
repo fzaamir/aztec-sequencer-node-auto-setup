@@ -38,19 +38,20 @@ read -p "🔧 Enter your choice [1-5]: " CHOICE
 # --- Fetch Latest Image Tag ---
 fetch_latest_image_tag() {
   echo -e "${CYAN}🔍 Checking for latest Aztec Docker image...${RESET}"
-  LATEST_TAG=$(curl -s "https://registry.hub.docker.com/v2/repositories/aztecprotocol/aztec/tags?page_size=100" \
+  TAG=$(curl -s "https://registry.hub.docker.com/v2/repositories/aztecprotocol/aztec/tags?page_size=100" \
     | jq -r '.results[].name' \
     | grep 'alpha-testnet' \
     | sort -Vr \
     | head -n 1)
 
-  if [[ -z "$LATEST_TAG" ]]; then
-    echo -e "${RED}❌ Failed to fetch latest tag. Falling back to default: 0.85.0-alpha-testnet.5${RESET}"
-    LATEST_TAG="0.85.0-alpha-testnet.5"
+  if [[ -z "$TAG" ]]; then
+    echo -e "${RED}❌ Failed to fetch latest tag from Docker Hub.${RESET}"
+    echo ""
+    return 1
   else
-    echo -e "${GREEN}✅ Found latest tag: ${BOLD}$LATEST_TAG${RESET}"
+    echo -e "${GREEN}✅ Found latest tag: ${BOLD}$TAG${RESET}"
+    echo "$TAG"
   fi
-  echo "$LATEST_TAG"
 }
 
 if [[ "$CHOICE" == "5" ]]; then
@@ -92,6 +93,10 @@ elif [[ "$CHOICE" == "3" ]]; then
   echo -e "${CYAN}♻️  Reinstalling Aztec Node using saved config...${RESET}"
   cd "$AZTEC_DIR"
   IMAGE_TAG=$(fetch_latest_image_tag)
+  if [[ -z "$IMAGE_TAG" ]]; then
+    echo -e "${RED}❌ Cannot continue without a valid image tag.${RESET}"
+    exit 1
+  fi
   docker pull aztecprotocol/aztec:$IMAGE_TAG
   docker compose down -v
   rm -rf /home/my-node/node
@@ -103,6 +108,11 @@ fi
 
 # --- Option 1: Full Install ---
 IMAGE_TAG=$(fetch_latest_image_tag)
+if [[ -z "$IMAGE_TAG" ]]; then
+  echo -e "${RED}❌ Cannot continue without a valid image tag.${RESET}"
+  exit 1
+fi
+
 SERVER_IP=$(curl -s https://ipinfo.io/ip || echo "127.0.0.1")
 echo -e "📡 ${YELLOW}Detected server IP: ${GREEN}${BOLD}$SERVER_IP${RESET}"
 read -p "🌐 Use this IP? (y/n): " use_detected_ip
