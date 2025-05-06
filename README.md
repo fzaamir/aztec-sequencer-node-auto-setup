@@ -1,4 +1,4 @@
-# 📘 Aztec Sequencer Node Auto-Setup
+# 🚀 AZTEC-NETWORK • FULLY AUTOMATED SEQUENCER NODE INSTALLER
 
 Deploy and manage an **Aztec Sequencer Validator Node** on **Ubuntu 20.04/22.04** using this interactive installer.
 
