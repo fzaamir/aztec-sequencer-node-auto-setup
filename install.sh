@@ -35,23 +35,6 @@ echo "  [5] ❌  Exit"
 echo -e "${RESET}"
 read -p "🔧 Enter your choice [1-5]: " CHOICE
 
-# --- Fetch Latest Image Tag ---
-fetch_latest_image_tag() {
-  echo -e "${CYAN}🔍 Checking for latest Aztec Docker image...${RESET}"
-  TAG=$(curl -s "https://registry.hub.docker.com/v2/repositories/aztecprotocol/aztec/tags?page_size=100" \
-    | jq -r '.results[].name' \
-    | grep '^0\.[0-9]*\.[0-9]*-alpha-testnet\.[0-9]*$' \
-    | sort -Vr \
-    | head -n 1)
-
-  if [[ -z "$TAG" ]]; then
-    echo -e "${RED}❌ Failed to fetch latest tag from Docker Hub.${RESET}" >&2
-    return 1
-  else
-    echo -e "${GREEN}✅ Found latest tag: ${BOLD}$TAG${RESET}" >&2
-    echo "$TAG"
-  fi
-}
 
 if [[ "$CHOICE" == "5" ]]; then
   echo -e "${YELLOW}👋 Exiting. Have a great day!${RESET}"
@@ -91,7 +74,7 @@ elif [[ "$CHOICE" == "3" ]]; then
 
   echo -e "${CYAN}♻️  Reinstalling Aztec Node using saved config...${RESET}"
   cd "$AZTEC_DIR"
-  IMAGE_TAG=$(fetch_latest_image_tag)
+  IMAGE_TAG="0.85.0-alpha-testnet.8"
   if [[ -z "$IMAGE_TAG" ]]; then
     echo -e "${RED}❌ Cannot continue without a valid image tag.${RESET}"
     exit 1
@@ -107,7 +90,7 @@ elif [[ "$CHOICE" == "3" ]]; then
 fi
 
 # --- Option 1: Full Install ---
-IMAGE_TAG=$(fetch_latest_image_tag)
+IMAGE_TAG="0.85.0-alpha-testnet.8"
 if [[ -z "$IMAGE_TAG" ]]; then
   echo -e "${RED}❌ Cannot continue without a valid image tag.${RESET}"
   exit 1
