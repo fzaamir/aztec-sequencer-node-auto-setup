@@ -222,3 +222,20 @@ while (( ATTEMPTS < MAX_ATTEMPTS )); do
   echo -e "🔄 Attempt $ATTEMPTS/$MAX_ATTEMPTS... waiting 5s"
   sleep 5
 done
+
+# --- Continuous Log Monitor with Error Recovery ---
+echo -e "
+🛠️  ${CYAN}Monitoring logs for critical errors...${RESET}"
+LOG_CHECK_INTERVAL=10
+while true; do
+  ERROR_DETECTED=$(docker logs aztec-sequencer 2>&1 | tail -n 200 | grep -F "Error: ERROR: world-state:block_stream Error processing block stream: Error: Obtained L1 to L2 messages failed to be hashed to the block inHash")
+  if [[ -n "$ERROR_DETECTED" ]]; then
+    echo -e "
+${RED}🔥 Critical error detected in logs. Restarting node and clearing state...${RESET}"
+    docker compose down -v
+    rm -rf /root/.aztec/alpha-testnet
+    docker compose up -d
+    echo -e "${GREEN}✅ Node restarted after error recovery.${RESET}"
+  fi
+  sleep $LOG_CHECK_INTERVAL
+done
