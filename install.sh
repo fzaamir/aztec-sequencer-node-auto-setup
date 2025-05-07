@@ -71,7 +71,7 @@ HTTP_PORT=8080
 
 # --- Install Dependencies ---
 echo -e "\n🔧 ${YELLOW}${BOLD}Setting up system dependencies...${RESET}"
-sudo apt update && sudo apt install -y curl jq git ufw apt-transport-https ca-certificates software-properties-common gnupg pinentry-tty
+sudo apt update && sudo apt install -y curl jq ufw ca-certificates gnupg
 
 sudo mkdir -p /etc/apt/keyrings
 curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /etc/apt/keyrings/docker.gpg
