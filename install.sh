@@ -29,13 +29,11 @@ echo -e "${CYAN}${BOLD}Please choose an option below:${RESET}"
 echo -e "${YELLOW}"
 echo "  [1] 📦  Install Aztec Sequencer Node"
 echo "  [2] 📄  View Aztec Node Logs"
-echo "  [3] ♻️   Reinstall Node (using saved config)"
-echo "  [4] 🔎  Show L2 Block Info + Sync Proof"
-echo "  [5] ❌  Exit"
+echo "  [3] ❌  Exit"
 echo -e "${RESET}"
-read -p "🔧 Enter your choice [1-5]: " CHOICE
+read -p "🔧 Enter your choice [1-3]: " CHOICE
 
-if [[ "$CHOICE" == "5" ]]; then
+if [[ "$CHOICE" == "3" ]]; then
   echo -e "${YELLOW}👋 Exiting. Have a great day!${RESET}"
   exit 0
 elif [[ "$CHOICE" == "2" ]]; then
@@ -46,41 +44,6 @@ elif [[ "$CHOICE" == "2" ]]; then
   else
     echo -e "${RED}❌ Aztec node directory not found: $AZTEC_DIR${RESET}"
   fi
-  exit 0
-elif [[ "$CHOICE" == "4" ]]; then
-  echo -e "\n🔍 ${CYAN}Fetching latest L2 block info...${RESET}"
-  HTTP_PORT=$(jq -r .HTTP_PORT "$CONFIG_FILE" 2>/dev/null || echo 8080)
-
-  BLOCK=$(curl -s -X POST -H 'Content-Type: application/json' \
-    -d '{"jsonrpc":"2.0","method":"node_getL2Tips","params":[],"id":67}' \
-    http://localhost:$HTTP_PORT | jq -r ".result.proven.number")
-
-  if [[ -z "$BLOCK" || "$BLOCK" == "null" ]]; then
-    echo -e "❌ ${RED}Failed to fetch block number.${RESET}"
-  else
-    echo -e "✅ ${GREEN}Current L2 Block Number: ${BOLD}$BLOCK${RESET}"
-    echo -e "🔗 ${CYAN}Sync Proof:${RESET}"
-    curl -s -X POST -H 'Content-Type: application/json' \
-      -d "{\"jsonrpc\":\"2.0\",\"method\":\"node_getArchiveSiblingPath\",\"params\":[\"$BLOCK\",\"$BLOCK\"],\"id\":67}" \
-      http://localhost:$HTTP_PORT | jq
-  fi
-  exit 0
-elif [[ "$CHOICE" == "3" ]]; then
-  if [[ ! -f "$CONFIG_FILE" || ! -f "$ENV_FILE" ]]; then
-    echo -e "${RED}❌ No saved config found. Run full install first (Option 1).${RESET}"
-    exit 1
-  fi
-
-  echo -e "${CYAN}♻️  Reinstalling Aztec Node using saved config...${RESET}"
-  cd "$AZTEC_DIR"
-  IMAGE_TAG="0.85.0-alpha-testnet.8"
-  echo -e "${CYAN}👅 Pulling aztecprotocol/aztec:$IMAGE_TAG ...${RESET}"
-  docker pull "aztecprotocol/aztec:$IMAGE_TAG"
-  docker compose down -v
-  rm -rf /home/my-node/node
-  sudo apt update -y && sudo apt upgrade -y
-  docker compose up -d
-  echo -e "${GREEN}✅ Node restarted with latest image and saved config.${RESET}"
   exit 0
 fi
 
@@ -97,7 +60,7 @@ mkdir -p "$AZTEC_DIR"
 
 read -s -p "🔑 Enter your ETH private key (no 0x): " ETH_PRIVATE_KEY
 echo
-echo "$ETH_PRIVATE_KEY" | gpg --batch --yes --symmetric --cipher-algo AES256 --pinentry-mode loopback --passphrase "aztec-dummy-pass" -o "$AZTEC_DIR/ethkey.gpg"
+PRIVATE_KEY="${ETH_PRIVATE_KEY}"
 unset ETH_PRIVATE_KEY
 
 echo -e "\n📦 ${YELLOW}Default ports are 40400 (P2P) and 8080 (RPC)${RESET}"
@@ -130,19 +93,15 @@ cat <<EOF > "$CONFIG_FILE"
 EOF
 
 cat <<EOF > "$ENV_FILE"
-VALIDATOR_PRIVATE_KEY_COMMAND=gpg --batch --yes --pinentry-mode loopback --passphrase 'aztec-dummy-pass' -d $AZTEC_DIR/ethkey.gpg
 P2P_IP=$SERVER_IP
 ETHEREUM_HOSTS=$ETHEREUM_HOSTS
 L1_CONSENSUS_HOST_URLS=$L1_CONSENSUS_HOST_URLS
+VALIDATOR_PRIVATE_KEY=$PRIVATE_KEY
 EOF
 
 # --- Install Dependencies ---
 echo -e "\n🔧 ${YELLOW}${BOLD}Setting up system dependencies...${RESET}"
 sudo apt update && sudo apt install -y curl jq git ufw apt-transport-https ca-certificates software-properties-common gnupg pinentry-tty
-sudo mkdir -p ~/.gnupg
-chmod 700 ~/.gnupg
-echo "pinentry-program /usr/bin/pinentry-tty" >> ~/.gnupg/gpg-agent.conf
-killall gpg-agent || true
 
 sudo apt-get remove -y containerd || true
 sudo apt-get purge -y containerd || true
@@ -172,7 +131,7 @@ services:
       ETHEREUM_HOSTS: \${ETHEREUM_HOSTS}
       L1_CONSENSUS_HOST_URLS: \${L1_CONSENSUS_HOST_URLS}
       DATA_DIRECTORY: /data
-      VALIDATOR_PRIVATE_KEY: "\$(\${VALIDATOR_PRIVATE_KEY_COMMAND})"
+      VALIDATOR_PRIVATE_KEY: \${VALIDATOR_PRIVATE_KEY}
       P2P_IP: \${P2P_IP}
       LOG_LEVEL: debug
     entrypoint: >
@@ -190,39 +149,18 @@ EOF
 cd "$AZTEC_DIR"
 docker compose up -d
 
-# --- Health Check ---
-echo -e "\n⏳ ${YELLOW}Waiting for Aztec node to come online...${RESET}"
-MAX_ATTEMPTS=180
-ATTEMPTS=0
-
-while (( ATTEMPTS < MAX_ATTEMPTS )); do
-  if curl -s --max-time 2 http://localhost:$HTTP_PORT > /dev/null; then
-    echo -e "\n✅ ${GREEN}${BOLD}Aztec node is live on port ${HTTP_PORT}!${RESET}"
-    break
-  fi
-
-  if ! docker ps | grep -q aztec-sequencer; then
-    echo -e "\n❌ ${RED}Container crashed. Restarting...${RESET}"
-    docker compose down -v
-    rm -rf /home/my-node/node
-    docker compose up -d
-    ATTEMPTS=0
-    sleep 10
-    continue
-  fi
-
-  ((ATTEMPTS++))
-  echo -e "🔄 Attempt $ATTEMPTS/$MAX_ATTEMPTS... waiting 5s"
-  sleep 5
-done
-
-# --- Continuous Log Monitor with Error Recovery ---
+# --- Continuous Health Monitoring ---
 echo -e "\n🛠️  ${CYAN}Monitoring logs for critical errors...${RESET}"
 LOG_CHECK_INTERVAL=10
 while true; do
-  ERROR_DETECTED=$(docker logs aztec-sequencer 2>&1 | tail -n 200 | grep -F "Error: ERROR: world-state:block_stream Error processing block stream: Error: Obtained L1 to L2 messages failed to be hashed to the block inHash")
+  if ! docker ps | grep -q aztec-sequencer; then
+    echo -e "\n❌ ${RED}Container stopped. Restarting...${RESET}"
+    docker compose up -d
+  fi
+
+  ERROR_DETECTED=$(docker logs aztec-sequencer 2>&1 | tail -n 200 | grep -F "Obtained L1 to L2 messages failed to be hashed to the block inHash")
   if [[ -n "$ERROR_DETECTED" ]]; then
-    echo -e "\n${RED}🔥 Critical error detected in logs. Restarting node and clearing state...${RESET}"
+    echo -e "\n${RED}🔥 Critical error detected. Restarting node and clearing state...${RESET}"
     docker compose down -v
     rm -rf /root/.aztec/alpha-testnet
     docker compose up -d
