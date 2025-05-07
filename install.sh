@@ -97,7 +97,7 @@ mkdir -p "$AZTEC_DIR"
 
 read -s -p "🔑 Enter your ETH private key (no 0x): " ETH_PRIVATE_KEY
 echo
-echo "$ETH_PRIVATE_KEY" | gpg --batch --yes --symmetric --cipher-algo AES256 --passphrase '' -o "$AZTEC_DIR/ethkey.gpg"
+echo "$ETH_PRIVATE_KEY" | gpg --batch --yes --symmetric --cipher-algo AES256 --pinentry-mode loopback --passphrase "aztec-dummy-pass" -o "$AZTEC_DIR/ethkey.gpg"
 unset ETH_PRIVATE_KEY
 
 echo -e "\n📦 ${YELLOW}Default ports are 40400 (P2P) and 8080 (RPC)${RESET}"
@@ -130,7 +130,7 @@ cat <<EOF > "$CONFIG_FILE"
 EOF
 
 cat <<EOF > "$ENV_FILE"
-VALIDATOR_PRIVATE_KEY_COMMAND=gpg --batch --yes --passphrase '' -d $AZTEC_DIR/ethkey.gpg
+VALIDATOR_PRIVATE_KEY_COMMAND=gpg --batch --yes --pinentry-mode loopback --passphrase 'aztec-dummy-pass' -d $AZTEC_DIR/ethkey.gpg
 P2P_IP=$SERVER_IP
 ETHEREUM_HOSTS=$ETHEREUM_HOSTS
 L1_CONSENSUS_HOST_URLS=$L1_CONSENSUS_HOST_URLS
