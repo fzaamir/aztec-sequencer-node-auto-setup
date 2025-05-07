@@ -138,7 +138,12 @@ EOF
 
 # --- Install Dependencies ---
 echo -e "\n🔧 ${YELLOW}${BOLD}Setting up system dependencies...${RESET}"
-sudo apt update && sudo apt install -y curl jq git ufw apt-transport-https ca-certificates software-properties-common gnupg
+sudo apt update && sudo apt install -y curl jq git ufw apt-transport-https ca-certificates software-properties-common gnupg pinentry-tty
+sudo mkdir -p ~/.gnupg
+chmod 700 ~/.gnupg
+echo "pinentry-program /usr/bin/pinentry-tty" >> ~/.gnupg/gpg-agent.conf
+killall gpg-agent || true
+
 sudo apt-get remove -y containerd || true
 sudo apt-get purge -y containerd || true
 
