@@ -93,6 +93,8 @@ if [[ "$use_detected_ip" != "y" && "$use_detected_ip" != "Y" ]]; then
     read -p "🔧 Enter your VPS/Server IP: " SERVER_IP
 fi
 
+mkdir -p "$AZTEC_DIR"
+
 read -s -p "🔑 Enter your ETH private key (no 0x): " ETH_PRIVATE_KEY
 echo
 echo "$ETH_PRIVATE_KEY" | gpg --batch --yes --symmetric --cipher-algo AES256 --passphrase '' -o "$AZTEC_DIR/ethkey.gpg"
@@ -117,7 +119,6 @@ ETHEREUM_HOSTS=${ETHEREUM_HOSTS:-"https://ethereum-sepolia-rpc.publicnode.com"}
 read -p "📱 L1_CONSENSUS_HOST_URLS [default: https://ethereum-sepolia-beacon-api.publicnode.com]: " L1_CONSENSUS_HOST_URLS
 L1_CONSENSUS_HOST_URLS=${L1_CONSENSUS_HOST_URLS:-"https://ethereum-sepolia-beacon-api.publicnode.com"}
 
-mkdir -p "$AZTEC_DIR"
 cat <<EOF > "$CONFIG_FILE"
 {
   "SERVER_IP": "$SERVER_IP",
