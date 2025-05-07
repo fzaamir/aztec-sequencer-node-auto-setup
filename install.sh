@@ -10,11 +10,8 @@ BLUE="\033[1;34m"
 YELLOW="\033[1;33m"
 CYAN="\033[1;36m"
 RED="\033[1;31m"
-MAGENTA="\033[1;35m"
 
 AZTEC_DIR="$HOME/aztec-sequencer"
-CONFIG_FILE="$AZTEC_DIR/config.json"
-ENV_FILE="$AZTEC_DIR/.env"
 
 # --- MENU HEADER ---
 clear
@@ -63,48 +60,18 @@ echo
 PRIVATE_KEY="${ETH_PRIVATE_KEY}"
 unset ETH_PRIVATE_KEY
 
-echo -e "\n📦 ${YELLOW}Default ports are 40400 (P2P) and 8080 (RPC)${RESET}"
-read -p "⚙️  Use custom ports? (y/n): " use_custom_ports
-
-if [[ "$use_custom_ports" == "y" || "$use_custom_ports" == "Y" ]]; then
-    read -p "📍 Enter P2P port [default: 40400]: " TCP_UDP_PORT
-    read -p "📍 Enter RPC port [default: 8080]: " HTTP_PORT
-    TCP_UDP_PORT=${TCP_UDP_PORT:-40400}
-    HTTP_PORT=${HTTP_PORT:-8080}
-else
-    TCP_UDP_PORT=40400
-    HTTP_PORT=8080
-fi
-
 read -p "🔗 ETHEREUM_HOSTS [default: https://ethereum-sepolia-rpc.publicnode.com]: " ETHEREUM_HOSTS
 ETHEREUM_HOSTS=${ETHEREUM_HOSTS:-"https://ethereum-sepolia-rpc.publicnode.com"}
 
 read -p "📱 L1_CONSENSUS_HOST_URLS [default: https://ethereum-sepolia-beacon-api.publicnode.com]: " L1_CONSENSUS_HOST_URLS
 L1_CONSENSUS_HOST_URLS=${L1_CONSENSUS_HOST_URLS:-"https://ethereum-sepolia-beacon-api.publicnode.com"}
 
-cat <<EOF > "$CONFIG_FILE"
-{
-  "SERVER_IP": "$SERVER_IP",
-  "TCP_UDP_PORT": "$TCP_UDP_PORT",
-  "HTTP_PORT": "$HTTP_PORT",
-  "ETHEREUM_HOSTS": "$ETHEREUM_HOSTS",
-  "L1_CONSENSUS_HOST_URLS": "$L1_CONSENSUS_HOST_URLS"
-}
-EOF
-
-cat <<EOF > "$ENV_FILE"
-P2P_IP=$SERVER_IP
-ETHEREUM_HOSTS=$ETHEREUM_HOSTS
-L1_CONSENSUS_HOST_URLS=$L1_CONSENSUS_HOST_URLS
-VALIDATOR_PRIVATE_KEY=$PRIVATE_KEY
-EOF
+TCP_UDP_PORT=40400
+HTTP_PORT=8080
 
 # --- Install Dependencies ---
 echo -e "\n🔧 ${YELLOW}${BOLD}Setting up system dependencies...${RESET}"
 sudo apt update && sudo apt install -y curl jq git ufw apt-transport-https ca-certificates software-properties-common gnupg pinentry-tty
-
-sudo apt-get remove -y containerd || true
-sudo apt-get purge -y containerd || true
 
 sudo mkdir -p /etc/apt/keyrings
 curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /etc/apt/keyrings/docker.gpg
@@ -128,11 +95,11 @@ services:
     image: aztecprotocol/aztec:$IMAGE_TAG
     container_name: aztec-sequencer
     environment:
-      ETHEREUM_HOSTS: \${ETHEREUM_HOSTS}
-      L1_CONSENSUS_HOST_URLS: \${L1_CONSENSUS_HOST_URLS}
+      ETHEREUM_HOSTS: $ETHEREUM_HOSTS
+      L1_CONSENSUS_HOST_URLS: $L1_CONSENSUS_HOST_URLS
       DATA_DIRECTORY: /data
-      VALIDATOR_PRIVATE_KEY: \${VALIDATOR_PRIVATE_KEY}
-      P2P_IP: \${P2P_IP}
+      VALIDATOR_PRIVATE_KEY: $PRIVATE_KEY
+      P2P_IP: $SERVER_IP
       LOG_LEVEL: debug
     entrypoint: >
       sh -c 'node --no-warnings /usr/src/yarn-project/aztec/dest/bin/index.js start --network alpha-testnet --node --archiver --sequencer'
