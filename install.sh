@@ -55,8 +55,7 @@ fi
 
 mkdir -p "$AZTEC_DIR"
 
-read -s -p "🔑 Enter your ETH private key (no 0x): " ETH_PRIVATE_KEY
-echo
+read -p "🔑 Enter your ETH private key (no 0x): " ETH_PRIVATE_KEY
 PRIVATE_KEY="${ETH_PRIVATE_KEY}"
 unset ETH_PRIVATE_KEY
 
