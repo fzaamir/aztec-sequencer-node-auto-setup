@@ -102,10 +102,10 @@ services:
       LOG_LEVEL: debug
     entrypoint: >
       sh -c 'node --no-warnings /usr/src/yarn-project/aztec/dest/bin/index.js start --network alpha-testnet --node --archiver --sequencer'
-    ports:
-      - $TCP_UDP_PORT:40400/tcp
-      - $TCP_UDP_PORT:40400/udp
-      - $HTTP_PORT:8080
+       ports:
+      - $TCP_UDP_PORT:50500/tcp
+      - $TCP_UDP_PORT:50500/udp
+      - $HTTP_PORT:9090
     volumes:
       - /home/my-node/node:/data
     restart: unless-stopped
