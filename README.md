@@ -1,40 +1,39 @@
 # 🚀 AZTEC-NETWORK • FULLY AUTOMATED SEQUENCER NODE
 
-Deploy and manage an **Aztec Sequencer Validator Node** on **Ubuntu 20.04/22.04** using this interactive installer.
+Deploy and manage an **Aztec Sequencer Node** on **Ubuntu 20.04/22.04** using this fully automated installer.
 
 ---
 
 ## 🚀 Features
 
-* ✅ Installs all required dependencies
-* ✅ Secure Docker + Firewall configuration
-* ✅ Prompts for Ethereum wallet & RPC settings
-* ✅ Starts Aztec validator node using Docker Compose
-* ✅ Saves configuration for reinstallation
-* ✅ Menu options to:
+✅ Installs all required dependencies
+✅ Secure Docker + UFW firewall setup
+✅ Prompts for Ethereum private key & RPC endpoints
+✅ Detects your server IP
+✅ Runs Aztec validator node via Docker Compose
+✅ Auto-restarts if container crashes
+✅ Monitors logs for critical sync errors
+✅ Clears corrupted state and auto-recovers
+✅ Interactive menu to:
 
-  * View logs
-  * Show block info + sync proof
-  * Reinstall with saved config
-* ✅ Auto-monitors logs for fatal sync errors
-* ✅ Automatically clears corrupted state and restarts the node
+* View real-time logs
+* Exit safely
 
 ---
 
 ## 📦 Requirements
 
-### System
+### Hardware
 
 * **8+ CPU cores**
 * **16+ GB RAM**
 * **100+ GB SSD (NVMe preferred)**
 
-### Wallet & Network
+### Network / Wallet
 
 * 🔐 Ethereum private key (without `0x`)
-* 🧾 Ethereum public address
 * 🌐 Sepolia L1 RPC URL (HTTP)
-* 🌐 Sepolia Beacon URL (HTTP)
+* 🌐 Sepolia Beacon API URL (HTTP)
 
 ---
 
@@ -48,27 +47,23 @@ bash <(curl -s https://raw.githubusercontent.com/fzaamir/aztec-validator-auto-se
 
 ---
 
-## 🧠 During Setup, You'll Provide:
+## 🧠 What You'll Provide During Setup
 
-* Ethereum private key (without `0x`)
-* Ethereum public address (starts with `0x`)
-* Sepolia RPC & Beacon endpoints
-* Custom ports (optional)
+* Ethereum private key (no `0x` prefix)
+* Sepolia RPC endpoint URL
+* Sepolia Beacon (Consensus) API URL
+* Confirmation or override of detected server IP
 
 ---
 
-## 🔍 Post-Installation
+## 🔍 After Installation
 
-After setup, your node will:
+Your node will:
 
-* Run in the background via Docker Compose
-* Monitor logs and recover from sync issues automatically
-
-Use the menu to:
-
-* View logs
-* Check sync status
-* Reinstall or update
+* Run in the background using Docker Compose
+* Auto-restart on crash
+* Recover automatically from sync errors
+* Monitor logs continuously for critical issues
 
 ---
 
@@ -80,16 +75,32 @@ Restart node:
 cd ~/aztec-sequencer && docker compose up -d
 ```
 
-Clear state and re-run node:
+Stop node:
 
 ```bash
-rm -rf /home/my-node/node
+cd ~/aztec-sequencer && docker compose down
+```
+
+Clear corrupted state and restart:
+
+```bash
+cd ~/aztec-sequencer
+docker compose down -v
+rm -rf ~/.aztec/alpha-testnet
 docker compose up -d
+```
+
+View logs:
+
+```bash
+cd ~/aztec-sequencer && docker compose logs -f
 ```
 
 ---
 
 ## 🙋 Support
 
-For help, visit the [Aztec Discord](https://discord.gg/aztecprotocol) and ask in the [`#operators` ](https://discord.com/channels/1144692727120937080/1367196595866828982) channel.
+Need help?
+Join the [Aztec Discord](https://discord.gg/aztecprotocol) and ask in [`#operators`](https://discord.com/channels/1144692727120937080/1367196595866828982).
+
 
