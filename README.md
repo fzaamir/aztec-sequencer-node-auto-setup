@@ -7,13 +7,21 @@ Deploy and manage an **Aztec Sequencer Node** on **Ubuntu 20.04/22.04** using th
 ## 🚀 Features
 
 ✅ Installs all required dependencies
+
 ✅ Secure Docker + UFW firewall setup
+
 ✅ Prompts for Ethereum private key & RPC endpoints
+
 ✅ Detects your server IP
+
 ✅ Runs Aztec validator node via Docker Compose
+
 ✅ Auto-restarts if container crashes
+
 ✅ Monitors logs for critical sync errors
+
 ✅ Clears corrupted state and auto-recovers
+
 ✅ Interactive menu to:
 
 * View real-time logs
