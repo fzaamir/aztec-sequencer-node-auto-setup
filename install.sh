@@ -208,7 +208,7 @@ main_menu() {
     clear
     echo -e "${BLUE}${BOLD}"
     echo "╔══════════════════════════════════════════════════════════════╗"
-    echo "║              🚀 AZTEC NETWORK • SEQUENCER NODE              ║"
+    echo "║              🚀 AZTEC NETWORK • SEQUENCER NODE               ║"
     echo "╚══════════════════════════════════════════════════════════════╝"
     echo -e "${RESET}"
     echo -e "${CYAN}${BOLD}1) 📦 Install & Start Node${RESET}"
