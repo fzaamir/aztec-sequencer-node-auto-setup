@@ -97,7 +97,8 @@ else
   curl -s -X POST -H 'Content-Type: application/json' \
     -d "{\"jsonrpc\":\"2.0\",\"method\":\"node_getArchiveSiblingPath\",\"params\":[\"$BLOCK\",\"$BLOCK\"],\"id\":67}" \
     http://localhost:8080/ | jq -r '.result'
-fi ```
+fi 
+```
 
 ---
 
