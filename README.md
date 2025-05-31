@@ -100,7 +100,7 @@ http://localhost:8080/ | jq -r '.result'
 ## 💬 Support
 
 * 💬 [Aztec Discord](https://discord.gg/aztecprotocol) → `#operators`
-* 🛠️ [GitHub Issues](https://github.com/your-repo/aztec-sequencer-auto-setup)
+* 🛠️ [GitHub Issues](https://github.com/fzaamir/aztec-sequencer-auto-setup)
 
 ---
 
