@@ -26,31 +26,14 @@ install_docker() {
     echo -e "${GREEN}✔ Docker is already installed.${RESET}"
     return
   fi
-
   echo -e "${CYAN}⏳ Installing Docker...${RESET}"
   sudo apt-get update -y &>/dev/null
-  sudo apt-get install -y \
-    apt-transport-https \
-    ca-certificates \
-    curl \
-    gnupg \
-    lsb-release &>/dev/null
-
+  sudo apt-get install -y apt-transport-https ca-certificates curl gnupg lsb-release &>/dev/null
   sudo mkdir -p /etc/apt/keyrings
-  curl -fsSL https://download.docker.com/linux/ubuntu/gpg \
-    | sudo gpg --dearmor -o /etc/apt/keyrings/docker.gpg
-  echo \
-    "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] \
-    https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" \
-    | sudo tee /etc/apt/sources.list.d/docker.list &>/dev/null
-
+  curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /etc/apt/keyrings/docker.gpg
+  echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" | sudo tee /etc/apt/sources.list.d/docker.list &>/dev/null
   sudo apt-get update -y &>/dev/null
-  sudo apt-get install -y \
-    docker-ce \
-    docker-ce-cli \
-    containerd.io \
-    docker-buildx-plugin &>/dev/null
-
+  sudo apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin &>/dev/null
   sudo systemctl enable --now docker
   echo -e "${GREEN}✔ Docker installation complete.${RESET}"
 }
@@ -61,17 +44,14 @@ install_docker_compose() {
     echo -e "${GREEN}✔ Docker Compose is already installed (${COMPOSE_CMD}).${RESET}"
     return
   fi
-
   echo -e "${CYAN}⏳ Installing Docker Compose (plugin)...${RESET}"
   sudo apt-get update -y &>/dev/null
   sudo apt-get install -y docker-compose-plugin &>/dev/null
-
   detect_compose
   if [[ -z "$COMPOSE_CMD" ]]; then
     echo -e "${RED}✖ Failed to install Docker Compose.${RESET}"
     exit 1
   fi
-
   echo -e "${GREEN}✔ Docker Compose installation complete (${COMPOSE_CMD}).${RESET}"
 }
 
@@ -95,14 +75,11 @@ full_reset() {
     sleep 1
     return
   fi
-
   echo -e "${CYAN}🧹 Removing Docker containers and images...${RESET}"
   docker rm -f aztec-sequencer 2>/dev/null || true
   docker rmi -f "$(docker images --filter=reference='aztecprotocol/aztec*' -q)" 2>/dev/null || true
-
   echo -e "${CYAN}🗑️ Deleting directories:${RESET}"
   rm -rf "$AZTEC_DIR" "$STATE_DIR"
-
   echo -e "${GREEN}✅ All data wiped. Returning to menu...${RESET}"
   sleep 1
 }
@@ -116,19 +93,10 @@ install_and_start_node() {
 
   local IP
   IP=$(curl -s https://ipinfo.io/ip || echo "127.0.0.1")
-  echo -e "📡 Detected IP: ${GREEN}${BOLD}${IP}${RESET}"
-  if ! prompt_yes_no "Use this IP?"; then
-    read -rp "Enter IP manually: " IP
-  fi
+  echo -e "📡 Using detected IP: ${GREEN}${BOLD}${IP}${RESET}"
 
   echo -e "${CYAN}📦 Checking and installing required packages...${RESET}"
-  REQ_PKGS=(
-    curl build-essential git wget lz4 jq make gcc nano
-    automake autoconf tmux htop nvme-cli libgbm1
-    pkg-config libssl-dev libleveldb-dev tar clang
-    bsdmainutils ncdu unzip ufw ca-certificates
-    gnupg lsb-release
-  )
+  REQ_PKGS=(curl build-essential git wget lz4 jq make gcc nano automake autoconf tmux htop nvme-cli libgbm1 pkg-config libssl-dev libleveldb-dev tar clang bsdmainutils ncdu unzip ufw ca-certificates gnupg lsb-release)
   MISSING_PKGS=()
   for pkg in "${REQ_PKGS[@]}"; do
     if ! dpkg -s "$pkg" &>/dev/null; then
@@ -209,7 +177,6 @@ view_logs() {
     read -n1 -s
     return
   fi
-
   echo -e "${CYAN}📄 Streaming logs for aztec-sequencer (Ctrl+C to stop)...${RESET}"
   pushd "$AZTEC_DIR" >/dev/null
   if [[ "$COMPOSE_CMD" == "docker-compose" ]]; then
@@ -218,9 +185,21 @@ view_logs() {
     $COMPOSE_CMD logs -f
   fi
   popd >/dev/null || true
-
   echo -e "${YELLOW}Returning to main menu...${RESET}"
   sleep 1
+}
+
+get_block_and_proof() {
+  BLOCK=$(curl -s -X POST -H 'Content-Type: application/json' -d '{"jsonrpc":"2.0","method":"node_getL2Tips","params":[],"id":67}' http://localhost:8080/ | jq -r '.result.proven.number')
+  if [[ -z "$BLOCK" || "$BLOCK" == "null" ]]; then
+    echo -e "${RED}❌ Failed to get block number${RESET}"
+  else
+    echo -e "${GREEN}✅ Block Number: $BLOCK${RESET}"
+    echo -e "${CYAN}🔗 Sync Proof:${RESET}"
+    curl -s -X POST -H 'Content-Type: application/json' -d "{\"jsonrpc\":\"2.0\",\"method\":\"node_getArchiveSiblingPath\",\"params\":[\"$BLOCK\",\"$BLOCK\"],\"id\":67}" http://localhost:8080/ | jq -r '.result'
+  fi
+  echo "Press any key to return to the main menu."
+  read -n1 -s
 }
 
 main_menu() {
@@ -233,21 +212,23 @@ main_menu() {
     echo "╚══════════════════════════════════════════════════════════════╝"
     echo -e "${RESET}"
     echo -e "${CYAN}${BOLD}1) 📦 Install & Start Node${RESET}"
-    echo -e "${CYAN}${BOLD}2) 📄 View Logs${RESET}"
-    echo -e "${CYAN}${BOLD}3) 🧹 Full Reset (wipe everything)${RESET}"
-    echo -e "${CYAN}${BOLD}4) ❌ Exit${RESET}"
-    read -rp "👉 Choice [1-4]: " CHOICE
+    echo -e "${CYAN}${BOLD}2) 📊 Get Block Number & Sync Proof${RESET}"
+    echo -e "${CYAN}${BOLD}3) 📄 View Logs${RESET}"
+    echo -e "${CYAN}${BOLD}4) 🧹 Full Reset (wipe everything)${RESET}"
+    echo -e "${CYAN}${BOLD}5) ❌ Exit${RESET}"
+    read -rp "👉 Choice [1-5]: " CHOICE
 
     case "$CHOICE" in
       1) install_and_start_node ;;
-      2) view_logs ;;
-      3) full_reset ;;
-      4)
+      2) get_block_and_proof ;;
+      3) view_logs ;;
+      4) full_reset ;;
+      5)
         echo -e "${YELLOW}👋 Goodbye!${RESET}"
         exit 0
         ;;
       *)
-        echo -e "${RED}❌ Invalid choice. Please enter a number between 1 and 4.${RESET}"
+        echo -e "${RED}❌ Invalid choice. Please enter a number between 1 and 5.${RESET}"
         sleep 1
         ;;
     esac
