@@ -1,83 +1,60 @@
-# 🚀 AZTEC-NETWORK • FULLY AUTOMATED SEQUENCER NODE
+# ⚡️ Aztec Sequencer Node Installer
 
-Deploy and manage an **Aztec Sequencer Node** on **Ubuntu 20.04/22.04** using this fully automated installer.
+Fully automated deployment & management of an **Aztec Sequencer Node** on **Ubuntu 20.04/22.04**.
 
 ---
 
-## 🚀 Features
+## ✨ Features
 
-✅ Installs all required dependencies
-
-✅ Secure Docker + UFW firewall setup
-
-✅ Prompts for Ethereum private key & RPC endpoints
-
-✅ Detects your server IP
-
-✅ Runs Aztec validator node via Docker Compose
-
-✅ Auto-restarts if container crashes
-
-✅ Monitors logs for critical sync errors
-
-✅ Clears corrupted state and auto-recovers
-
-✅ Interactive menu to:
-
-* View real-time logs
-* Exit safely
+* 🔧 Auto-installs Docker, Compose & required dependencies
+* 🔐 Configures UFW firewall securely
+* 🌐 Detects and applies your public IP automatically
+* 🧠 Prompts for ETH key, public address, RPC & Beacon URLs
+* 🐳 Runs node in Docker Compose with auto-restart
+* 📊 Fetches L2 block number & sync proof
+* 🧹 Full reset option to wipe and reinitialize
+* 🖥️ Real-time log viewer
+* 📋 Interactive menu for full control
 
 ---
 
 ## 📦 Requirements
 
-### Hardware
-
-* **8+ CPU cores**
-* **16+ GB RAM**
-* **100+ GB SSD (NVMe preferred)**
-
-### Network / Wallet
-
-* 🔐 Ethereum private key (without `0x`)
-* 🌐 Sepolia L1 RPC URL (HTTP)
-* 🌐 Sepolia Beacon API URL (HTTP)
+| Resource     | Minimum                                         |
+| ------------ | ----------------------------------------------- |
+| OS           | Ubuntu 20.04+                                   |
+| CPU          | 8 cores                                         |
+| RAM          | 16 GB                                           |
+| Disk         | 100 GB SSD                                      |
+| Network Keys | Ethereum privkey (no `0x`), RPC URL, Beacon URL |
 
 ---
 
-## 🧑‍💻 Quick Start
+## 🚀 Quick Install
 
-Paste this into your terminal:
+Paste into terminal:
 
 ```bash
-bash <(curl -s https://raw.githubusercontent.com/fzaamir/aztec-validator-auto-setup/main/install.sh)
+bash <(curl -s https://raw.githubusercontent.com/your-repo/aztec-sequencer-auto-setup/main/install.sh)
 ```
 
 ---
 
-## 🧠 What You'll Provide During Setup
+## 🧪 Interactive Menu Options
 
-* Ethereum private key (no `0x` prefix)
-* Sepolia RPC endpoint URL
-* Sepolia Beacon (Consensus) API URL
-* Confirmation or override of detected server IP
-
----
-
-## 🔍 After Installation
-
-Your node will:
-
-* Run in the background using Docker Compose
-* Auto-restart on crash
-* Recover automatically from sync errors
-* Monitor logs continuously for critical issues
+```
+1️⃣  Install & Start Node
+2️⃣  Get Latest Block + Sync Proof
+3️⃣  View Real-Time Logs
+4️⃣  Full Reset (wipe everything)
+5️⃣  Exit
+```
 
 ---
 
 ## 🔧 Manual Commands
 
-Restart node:
+Start node:
 
 ```bash
 cd ~/aztec-sequencer && docker compose up -d
@@ -89,26 +66,45 @@ Stop node:
 cd ~/aztec-sequencer && docker compose down
 ```
 
-Clear corrupted state and restart:
-
-```bash
-cd ~/aztec-sequencer
-docker compose down -v
-rm -rf ~/.aztec/alpha-testnet
-docker compose up -d
-```
-
 View logs:
 
 ```bash
 cd ~/aztec-sequencer && docker compose logs -f
 ```
 
+Reset everything:
+
+```bash
+docker compose down -v
+rm -rf ~/aztec-sequencer ~/.aztec/alpha-testnet
+```
+
 ---
 
-## 🙋 Support
+## 📊 Get Block Number & Sync Proof
 
-Need help?
-Join the [Aztec Discord](https://discord.gg/aztecprotocol) and ask in [`#operators`](https://discord.com/channels/1144692727120937080/1367196595866828982).
+```bash
+curl -s -X POST -H 'Content-Type: application/json' \
+-d '{"jsonrpc":"2.0","method":"node_getL2Tips","params":[],"id":1}' \
+http://localhost:8080/ | jq -r '.result.proven.number'
+```
 
+```bash
+curl -s -X POST -H 'Content-Type: application/json' \
+-d '{"jsonrpc":"2.0","method":"node_getArchiveSiblingPath","params":["BLOCK_NUM","BLOCK_NUM"],"id":1}' \
+http://localhost:8080/ | jq -r '.result'
+```
 
+---
+
+## 💬 Support
+
+* 💬 [Aztec Discord](https://discord.gg/aztecprotocol) → `#operators`
+* 🛠️ [GitHub Issues](https://github.com/your-repo/aztec-sequencer-auto-setup)
+
+---
+
+### 🛡️ Built for Operators
+
+Minimal. Secure. Resilient.
+Plug it in. Let it run. 🟢
