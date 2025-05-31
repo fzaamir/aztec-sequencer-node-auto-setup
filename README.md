@@ -83,17 +83,21 @@ rm -rf ~/aztec-sequencer ~/.aztec/alpha-testnet
 
 ## 📊 Get Block Number & Sync Proof
 
-```bash
-curl -s -X POST -H 'Content-Type: application/json' \
--d '{"jsonrpc":"2.0","method":"node_getL2Tips","params":[],"id":1}' \
-http://localhost:8080/ | jq -r '.result.proven.number'
-```
+``` #!/bin/bash
 
-```bash
-curl -s -X POST -H 'Content-Type: application/json' \
--d '{"jsonrpc":"2.0","method":"node_getArchiveSiblingPath","params":["BLOCK_NUM","BLOCK_NUM"],"id":1}' \
-http://localhost:8080/ | jq -r '.result'
-```
+BLOCK=$(curl -s -X POST -H 'Content-Type: application/json' \
+  -d '{"jsonrpc":"2.0","method":"node_getL2Tips","params":[],"id":67}' \
+  http://localhost:8080/ | jq -r '.result.proven.number')
+
+if [[ -z "$BLOCK" || "$BLOCK" == "null" ]]; then
+  echo "❌ Failed to get block number"
+else
+  echo "✅ Block Number: $BLOCK"
+  echo "🔗 Sync Proof:"
+  curl -s -X POST -H 'Content-Type: application/json' \
+    -d "{\"jsonrpc\":\"2.0\",\"method\":\"node_getArchiveSiblingPath\",\"params\":[\"$BLOCK\",\"$BLOCK\"],\"id\":67}" \
+    http://localhost:8080/ | jq -r '.result'
+fi ```
 
 ---
 
