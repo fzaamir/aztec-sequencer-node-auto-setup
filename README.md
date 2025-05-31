@@ -35,7 +35,7 @@ Fully automated deployment & management of an **Aztec Sequencer Node** on **Ubun
 Paste into terminal:
 
 ```bash
-bash <(curl -s https://raw.githubusercontent.com/fzaamir/aztec-sequencer-auto-setup/main/install.sh)
+bash <(curl -s https://raw.githubusercontent.com/fzaamir/aztec-validator-auto-setup/main/install.sh)
 ```
 
 ---
