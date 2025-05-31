@@ -1,22 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-for cmd in curl docker jq ufw; do
-  if ! command -v $cmd &>/dev/null; then
-    echo "❌ Missing command: $cmd" >&2
-    exit 1
-  fi
-done
-
-if command -v docker-compose &>/dev/null; then
-  COMPOSE="docker-compose"
-elif docker compose version &>/dev/null; then
-  COMPOSE="docker compose"
-else
-  echo "❌ docker-compose not found" >&2
-  exit 1
-fi
-
 BOLD=$(tput bold) RESET=$(tput sgr0)
 GREEN="\033[1;32m" BLUE="\033[1;34m"
 YELLOW="\033[1;33m" CYAN="\033[1;36m" RED="\033[1;31m"
