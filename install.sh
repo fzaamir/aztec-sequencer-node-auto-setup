@@ -141,7 +141,6 @@ LOG_LEVEL=debug
 EOF
 
   cat >"$AZTEC_DIR/docker-compose.yml" <<EOF
-version: '3.8'
 services:
   aztec-node:
     image: aztecprotocol/aztec:${IMAGE_TAG}
