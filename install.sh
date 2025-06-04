@@ -8,7 +8,7 @@ YELLOW="\033[1;33m" CYAN="\033[1;36m" RED="\033[1;31m"
 AZTEC_DIR="$HOME/aztec-sequencer"
 DATA_DIR="$AZTEC_DIR/data"
 STATE_DIR="$HOME/.aztec/alpha-testnet"
-IMAGE_TAG="0.87.6"
+IMAGE_TAG="0.87.7"
 LOG_CHECK_INTERVAL=10
 
 detect_compose() {
