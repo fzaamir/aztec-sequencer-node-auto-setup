@@ -6,8 +6,8 @@ GREEN="\033[1;32m" BLUE="\033[1;34m"
 YELLOW="\033[1;33m" CYAN="\033[1;36m" RED="\033[1;31m"
 
 AZTEC_DIR="$HOME/aztec-sequencer"
-DATA_DIR="$AZTEC_DIR/data"
-IMAGE_TAG="0.87.7"
+DATA_DIR="/root/.aztec/alpha-testnet/data"
+IMAGE_TAG="0.87.6"  # fixed to match your Compose block
 LOG_CHECK_INTERVAL=10
 
 detect_compose() {
@@ -75,7 +75,7 @@ full_reset() {
     return
   fi
   echo -e "${CYAN}🧹 Removing Docker containers and images...${RESET}"
-  docker rm -f aztec-sequencer 2>/dev/null || true
+  docker rm -f aztec 2>/dev/null || true
   docker rmi -f "$(docker images --filter=reference='aztecprotocol/aztec*' -q)" 2>/dev/null || true
   echo -e "${CYAN}🗑️ Deleting directories:${RESET}"
   rm -rf "$AZTEC_DIR"
@@ -136,22 +136,32 @@ L1_CONSENSUS_HOST_URLS=$BCN_URL
 VALIDATOR_PRIVATE_KEY=0x$PRIV_KEY
 COINBASE=$PUB_ADDR
 P2P_IP=$IP
-LOG_LEVEL=debug
+LOG_LEVEL=info
 EOF
 
   cat >"$AZTEC_DIR/docker-compose.yml" <<EOF
 services:
   aztec-node:
-    image: aztecprotocol/aztec:${IMAGE_TAG}
-    container_name: aztec-sequencer
+    container_name: aztec
     network_mode: host
-    env_file: .env
-    entrypoint: >
-      sh -c 'node --no-warnings /usr/src/yarn-project/aztec/dest/bin/index.js \
-        start --network alpha-testnet --node --archiver --sequencer'
-    volumes:
-      - ${DATA_DIR}:/data
+    image: aztecprotocol/aztec:${IMAGE_TAG}
     restart: unless-stopped
+    environment:
+      ETHEREUM_HOSTS: \${ETHEREUM_HOSTS}
+      L1_CONSENSUS_HOST_URLS: \${L1_CONSENSUS_HOST_URLS}
+      DATA_DIRECTORY: /data
+      VALIDATOR_PRIVATE_KEY: \${VALIDATOR_PRIVATE_KEY}
+      COINBASE: \${COINBASE}
+      P2P_IP: \${P2P_IP}
+      LOG_LEVEL: info
+    entrypoint: >
+      sh -c 'node --no-warnings /usr/src/yarn-project/aztec/dest/bin/index.js start --network alpha-testnet --node --archiver --sequencer'
+    ports:
+      - 40400:40400/tcp
+      - 40400:40400/udp
+      - 8080:8080
+    volumes:
+      - /root/.aztec/alpha-testnet/data/:/data
 EOF
 
   echo -e "${CYAN}🚀 Starting Aztec sequencer container...${RESET}"
@@ -171,7 +181,7 @@ view_logs() {
     read -n1 -s
     return
   fi
-  echo -e "${CYAN}📄 Streaming logs for aztec-sequencer (Ctrl+C to stop)...${RESET}"
+  echo -e "${CYAN}📄 Streaming logs for aztec (Ctrl+C to stop)...${RESET}"
   pushd "$AZTEC_DIR" >/dev/null
   $COMPOSE_CMD logs -f
   popd >/dev/null || true
