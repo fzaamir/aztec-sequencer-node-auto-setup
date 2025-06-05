@@ -7,7 +7,6 @@ YELLOW="\033[1;33m" CYAN="\033[1;36m" RED="\033[1;31m"
 
 AZTEC_DIR="$HOME/aztec-sequencer"
 DATA_DIR="$AZTEC_DIR/data"
-STATE_DIR="$HOME/.aztec/alpha-testnet"
 IMAGE_TAG="0.87.7"
 LOG_CHECK_INTERVAL=10
 
@@ -79,7 +78,7 @@ full_reset() {
   docker rm -f aztec-sequencer 2>/dev/null || true
   docker rmi -f "$(docker images --filter=reference='aztecprotocol/aztec*' -q)" 2>/dev/null || true
   echo -e "${CYAN}🗑️ Deleting directories:${RESET}"
-  rm -rf "$AZTEC_DIR" "$STATE_DIR"
+  rm -rf "$AZTEC_DIR"
   echo -e "${GREEN}✅ All data wiped. Returning to menu...${RESET}"
   sleep 1
 }
@@ -126,8 +125,8 @@ install_and_start_node() {
   echo 'export PATH="$HOME/.aztec/bin:$PATH"' >> ~/.bashrc
   export PATH="$HOME/.aztec/bin:$PATH"
 
-  echo -e "${CYAN}⚙️ Initializing Aztec alpha-testnet...${RESET}"
-  aztec-up alpha-testnet
+  echo -e "${CYAN}⚙️ Initializing Aztec latest...${RESET}"
+  aztec-up latest
 
   mkdir -p "$DATA_DIR" "$AZTEC_DIR"
 
@@ -157,11 +156,7 @@ EOF
 
   echo -e "${CYAN}🚀 Starting Aztec sequencer container...${RESET}"
   pushd "$AZTEC_DIR" >/dev/null
-  if [[ "$COMPOSE_CMD" == "docker-compose" ]]; then
-    $COMPOSE_CMD up -d
-  else
-    $COMPOSE_CMD up -d
-  fi
+  $COMPOSE_CMD up -d
   popd >/dev/null
 
   echo -e "\n${GREEN}✅ Node started successfully!${RESET}"
@@ -178,11 +173,7 @@ view_logs() {
   fi
   echo -e "${CYAN}📄 Streaming logs for aztec-sequencer (Ctrl+C to stop)...${RESET}"
   pushd "$AZTEC_DIR" >/dev/null
-  if [[ "$COMPOSE_CMD" == "docker-compose" ]]; then
-    $COMPOSE_CMD logs -f
-  else
-    $COMPOSE_CMD logs -f
-  fi
+  $COMPOSE_CMD logs -f
   popd >/dev/null || true
   echo -e "${YELLOW}Returning to main menu...${RESET}"
   sleep 1
