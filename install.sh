@@ -7,7 +7,7 @@ YELLOW="\033[1;33m" CYAN="\033[1;36m" RED="\033[1;31m"
 
 AZTEC_DIR="$HOME/aztec-sequencer"
 DATA_DIR="/root/.aztec/alpha-testnet/data"
-IMAGE_TAG="0.87.7" 
+IMAGE_TAG="latest"
 LOG_CHECK_INTERVAL=10
 
 detect_compose() {
@@ -79,7 +79,9 @@ full_reset() {
   docker rmi -f "$(docker images --filter=reference='aztecprotocol/aztec*' -q)" 2>/dev/null || true
   echo -e "${CYAN}🗑️ Deleting directories:${RESET}"
   rm -rf "$AZTEC_DIR"
-  echo -e "${GREEN}✅ All data wiped. Returning to menu...${RESET}"
+  echo -e "${CYAN}📅 Pulling latest aztec image...${RESET}"
+  docker pull aztecprotocol/aztec:latest
+  echo -e "${GREEN}✅ All data wiped and latest image pulled. Returning to menu...${RESET}"
   sleep 1
 }
 
@@ -88,11 +90,11 @@ install_and_start_node() {
   read -rp "🔑 ETH private key (no 0x): " PRIV_KEY
   read -rp "📬 ETH public address (0x…): " PUB_ADDR
   read -rp "🌐 Sepolia RPC URL: " RPC_URL
-  read -rp "🛰️  Sepolia Beacon URL: " BCN_URL
+  read -rp "🚀 Sepolia Beacon URL: " BCN_URL
 
   local IP
   IP=$(curl -s https://ipinfo.io/ip || echo "127.0.0.1")
-  echo -e "📡 Using detected IP: ${GREEN}${BOLD}${IP}${RESET}"
+  echo -e "📱 Using detected IP: ${GREEN}${BOLD}${IP}${RESET}"
 
   echo -e "${CYAN}📦 Checking and installing required packages...${RESET}"
   REQ_PKGS=(curl build-essential git wget lz4 jq make gcc nano automake autoconf tmux htop nvme-cli libgbm1 pkg-config libssl-dev libleveldb-dev tar clang bsdmainutils ncdu unzip ufw ca-certificates gnupg lsb-release)
@@ -164,12 +166,20 @@ services:
       - /root/.aztec/alpha-testnet/data/:/data
 EOF
 
-  echo -e "${CYAN}🚀 Starting Aztec sequencer container...${RESET}"
+  echo -e "${CYAN}📥 Pulling and checking for image update...${RESET}"
+  OLD_DIGEST=$(docker inspect --format='{{index .RepoDigests 0}}' aztecprotocol/aztec:latest 2>/dev/null || echo "")
+  docker pull aztecprotocol/aztec:latest &>/dev/null
+  NEW_DIGEST=$(docker inspect --format='{{index .RepoDigests 0}}' aztecprotocol/aztec:latest 2>/dev/null || echo "")
+
   pushd "$AZTEC_DIR" >/dev/null
+  if [[ "$OLD_DIGEST" != "$NEW_DIGEST" ]]; then
+    echo -e "${YELLOW}⬆️ New image detected. Restarting container...${RESET}"
+    $COMPOSE_CMD down
+  fi
   $COMPOSE_CMD up -d
   popd >/dev/null
 
-  echo -e "\n${GREEN}✅ Node started successfully!${RESET}"
+  echo -e "\n${GREEN}✅ Node setup complete!${RESET}"
   echo "Press any key to return to the main menu."
   read -n1 -s
 }
@@ -216,7 +226,7 @@ main_menu() {
     echo -e "${CYAN}${BOLD}3) 📄 View Logs${RESET}"
     echo -e "${CYAN}${BOLD}4) 🧹 Full Reset (wipe everything)${RESET}"
     echo -e "${CYAN}${BOLD}5) ❌ Exit${RESET}"
-    read -rp "👉 Choice [1-5]: " CHOICE
+    read -rp "🔀 Choice [1-5]: " CHOICE
 
     case "$CHOICE" in
       1) install_and_start_node ;;
