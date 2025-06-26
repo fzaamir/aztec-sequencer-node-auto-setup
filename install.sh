@@ -79,9 +79,8 @@ full_reset() {
   docker rmi -f "$(docker images --filter=reference='aztecprotocol/aztec*' -q)" 2>/dev/null || true
   echo -e "${CYAN}🗑️ Deleting directories:${RESET}"
   rm -rf "$AZTEC_DIR"
-  echo -e "${CYAN}📅 Pulling latest aztec image...${RESET}"
-  docker pull aztecprotocol/aztec:latest
-  echo -e "${GREEN}✅ All data wiped and latest image pulled. Returning to menu...${RESET}"
+  rm -rf "$DATA_DIR"
+  echo -e "${GREEN}✅ All data wiped. Returning to menu...${RESET}"
   sleep 1
 }
 
@@ -166,16 +165,7 @@ services:
       - /root/.aztec/alpha-testnet/data/:/data
 EOF
 
-  echo -e "${CYAN}📥 Pulling and checking for image update...${RESET}"
-  OLD_DIGEST=$(docker inspect --format='{{index .RepoDigests 0}}' aztecprotocol/aztec:latest 2>/dev/null || echo "")
-  docker pull aztecprotocol/aztec:latest &>/dev/null
-  NEW_DIGEST=$(docker inspect --format='{{index .RepoDigests 0}}' aztecprotocol/aztec:latest 2>/dev/null || echo "")
-
   pushd "$AZTEC_DIR" >/dev/null
-  if [[ "$OLD_DIGEST" != "$NEW_DIGEST" ]]; then
-    echo -e "${YELLOW}⬆️ New image detected. Restarting container...${RESET}"
-    $COMPOSE_CMD down
-  fi
   $COMPOSE_CMD up -d
   popd >/dev/null
 
@@ -199,19 +189,6 @@ view_logs() {
   sleep 1
 }
 
-get_block_and_proof() {
-  BLOCK=$(curl -s -X POST -H 'Content-Type: application/json' -d '{"jsonrpc":"2.0","method":"node_getL2Tips","params":[],"id":67}' http://localhost:8080/ | jq -r '.result.proven.number')
-  if [[ -z "$BLOCK" || "$BLOCK" == "null" ]]; then
-    echo -e "${RED}❌ Failed to get block number${RESET}"
-  else
-    echo -e "${GREEN}✅ Block Number: $BLOCK${RESET}"
-    echo -e "${CYAN}🔗 Sync Proof:${RESET}"
-    curl -s -X POST -H 'Content-Type: application/json' -d "{\"jsonrpc\":\"2.0\",\"method\":\"node_getArchiveSiblingPath\",\"params\":[\"$BLOCK\",\"$BLOCK\"],\"id\":67}" http://localhost:8080/ | jq -r '.result'
-  fi
-  echo "Press any key to return to the main menu."
-  read -n1 -s
-}
-
 main_menu() {
   detect_compose
   while true; do
@@ -222,23 +199,21 @@ main_menu() {
     echo "╚══════════════════════════════════════════════════════════════╝"
     echo -e "${RESET}"
     echo -e "${CYAN}${BOLD}1) 📦 Install & Start Node${RESET}"
-    echo -e "${CYAN}${BOLD}2) 📊 Get Block Number & Sync Proof${RESET}"
-    echo -e "${CYAN}${BOLD}3) 📄 View Logs${RESET}"
-    echo -e "${CYAN}${BOLD}4) 🧹 Full Reset (wipe everything)${RESET}"
-    echo -e "${CYAN}${BOLD}5) ❌ Exit${RESET}"
-    read -rp "🔀 Choice [1-5]: " CHOICE
+    echo -e "${CYAN}${BOLD}2) 📄 View Logs${RESET}"
+    echo -e "${CYAN}${BOLD}3) 🧹 Full Reset (wipe everything)${RESET}"
+    echo -e "${CYAN}${BOLD}4) ❌ Exit${RESET}"
+    read -rp "🔀 Choice [1-4]: " CHOICE
 
     case "$CHOICE" in
       1) install_and_start_node ;;
-      2) get_block_and_proof ;;
-      3) view_logs ;;
-      4) full_reset ;;
-      5)
+      2) view_logs ;;
+      3) full_reset ;;
+      4)
         echo -e "${YELLOW}👋 Goodbye!${RESET}"
         exit 0
         ;;
       *)
-        echo -e "${RED}❌ Invalid choice. Please enter a number between 1 and 5.${RESET}"
+        echo -e "${RED}❌ Invalid choice. Please enter a number between 1 and 4.${RESET}"
         sleep 1
         ;;
     esac
