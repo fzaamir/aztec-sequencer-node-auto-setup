@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+# Styles
 BOLD=$(tput bold) RESET=$(tput sgr0)
 GREEN="\033[1;32m" BLUE="\033[1;34m"
 YELLOW="\033[1;33m" CYAN="\033[1;36m" RED="\033[1;31m"
@@ -10,6 +11,7 @@ DATA_DIR="/root/.aztec/alpha-testnet/data"
 IMAGE_TAG="latest"
 LOG_CHECK_INTERVAL=10
 
+# Detect Docker Compose
 detect_compose() {
   if command -v docker-compose >/dev/null 2>&1; then
     COMPOSE_CMD="docker-compose"
@@ -18,6 +20,25 @@ detect_compose() {
   else
     COMPOSE_CMD=""
   fi
+}
+
+# Animated, bold typewriter banner
+draw_banner() {
+  local border="══════════════════════════════════════════════════════════════"
+  local top="╔${border}╗"
+  local mid="║              🚀 AZTEC NETWORK • SEQUENCER NODE               ║"
+  local bot="╚${border}╝"
+  for line in "$top" "$mid" "$bot"; do
+    # start bold for the line
+    echo -ne "${BOLD}"
+    for ((i=0; i<${#line}; i++)); do
+      # print each char in bold cyan
+      echo -ne "${CYAN}${line:$i:1}${RESET}${BOLD}"
+      sleep 0.002
+    done
+    # reset at end of line and newline
+    echo -e "${RESET}"
+  done
 }
 
 install_docker() {
@@ -30,7 +51,8 @@ install_docker() {
   sudo apt-get install -y apt-transport-https ca-certificates curl gnupg lsb-release &>/dev/null
   sudo mkdir -p /etc/apt/keyrings
   curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /etc/apt/keyrings/docker.gpg
-  echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" | sudo tee /etc/apt/sources.list.d/docker.list &>/dev/null
+  echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" \
+    | sudo tee /etc/apt/sources.list.d/docker.list &>/dev/null
   sudo apt-get update -y &>/dev/null
   sudo apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin &>/dev/null
   sudo systemctl enable --now docker
@@ -54,7 +76,7 @@ install_docker_compose() {
   echo -e "${GREEN}✔ Docker Compose installation complete (${COMPOSE_CMD}).${RESET}"
 }
 
-animated_spinner() {
+# Simple animated spinner\animated_spinner() {
   local pid=$1
   local delay=0.1
   local spinner='|/-\\'
@@ -90,7 +112,9 @@ install_and_start_node() {
     return
   fi
 
-  REQ_PKGS=(curl build-essential git wget lz4 jq make gcc nano automake autoconf tmux htop nvme-cli libgbm1 pkg-config libssl-dev libleveldb-dev tar clang bsdmainutils ncdu unzip ufw ca-certificates gnupg lsb-release)
+  REQ_PKGS=(curl build-essential git wget lz4 jq make gcc nano automake autoconf tmux htop \
+             nvme-cli libgbm1 pkg-config libssl-dev libleveldb-dev tar clang bsdmainutils ncdu \
+             unzip ufw ca-certificates gnupg lsb-release)
   MISSING_PKGS=()
   for pkg in "${REQ_PKGS[@]}"; do
     if ! dpkg -s "$pkg" &>/dev/null; then
@@ -162,15 +186,6 @@ services:
       - /root/.aztec/alpha-testnet/data/:/data
 EOF
 
-  pushd "$AZTEC_DIR" >/dev/null
-  $COMPOSE_CMD up -d
-  popd >/dev/null
-
-  echo -e "\n${GREEN}✅ Node setup complete!${RESET}"
-  echo "Press any key to return to the main menu."
-  read -n1 -s
-}
-
 view_logs() {
   if [[ ! -d "$AZTEC_DIR" ]]; then
     echo -e "${RED}❌ Directory not found: $AZTEC_DIR${RESET}"
@@ -190,12 +205,9 @@ main_menu() {
   detect_compose
   while true; do
     clear
-    echo -e "${BLUE}${BOLD}"
-    echo "╔══════════════════════════════════════════════════════════════╗"
-    echo "║              🚀 AZTEC NETWORK • SEQUENCER NODE               ║"
-    echo "╚══════════════════════════════════════════════════════════════╝"
-    echo -e "${RESET}"
-    echo -e "${CYAN}${BOLD}1) 📦 Install & Start Node${RESET}"
+    draw_banner
+    echo -e "
+${CYAN}${BOLD}1) 📦 Install & Start Node${RESET}"
     echo -e "${CYAN}${BOLD}2) 📄 View Logs${RESET}"
     echo -e "${CYAN}${BOLD}3) 🧹 Full Reset (wipe everything)${RESET}"
     echo -e "${CYAN}${BOLD}4) ❌ Exit${RESET}"
