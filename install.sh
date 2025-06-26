@@ -54,34 +54,17 @@ install_docker_compose() {
   echo -e "${GREEN}✔ Docker Compose installation complete (${COMPOSE_CMD}).${RESET}"
 }
 
-prompt_yes_no() {
-  local prompt_msg="$1"
-  local response
-  while true; do
-    read -rp "$prompt_msg (y/n): " response
-    case "$response" in
-      [Yy]* ) return 0 ;;
-      [Nn]* ) return 1 ;;
-      * ) echo "Please answer y or n." ;;
-    esac
+animated_spinner() {
+  local pid=$1
+  local delay=0.1
+  local spinner='|/-\\'
+  while kill -0 $pid 2>/dev/null; do
+    for char in $spinner; do
+      echo -ne "${CYAN}$char${RESET}"
+      sleep $delay
+      echo -ne '\b'
+    done
   done
-}
-
-full_reset() {
-  echo -e "${YELLOW}⚠️  You are about to wipe all Aztec sequencer data.${RESET}"
-  if ! prompt_yes_no "Are you sure you want to proceed?"; then
-    echo -e "${CYAN}Operation cancelled. Returning to menu...${RESET}"
-    sleep 1
-    return
-  fi
-  echo -e "${CYAN}🧹 Removing Docker containers and images...${RESET}"
-  docker rm -f aztec 2>/dev/null || true
-  docker rmi -f "$(docker images --filter=reference='aztecprotocol/aztec*' -q)" 2>/dev/null || true
-  echo -e "${CYAN}🗑️ Deleting directories:${RESET}"
-  rm -rf "$AZTEC_DIR"
-  rm -rf "$DATA_DIR"
-  echo -e "${GREEN}✅ All data wiped. Returning to menu...${RESET}"
-  sleep 1
 }
 
 install_and_start_node() {
@@ -96,6 +79,17 @@ install_and_start_node() {
   echo -e "📱 Using detected IP: ${GREEN}${BOLD}${IP}${RESET}"
 
   echo -e "${CYAN}📦 Checking and installing required packages...${RESET}"
+  if [[ -f /etc/debian_version ]]; then
+    PKG_MANAGER="sudo apt-get install -y"
+    UPDATE_CMD="sudo apt-get update -y"
+  elif [[ -f /etc/redhat-release ]]; then
+    PKG_MANAGER="sudo yum install -y"
+    UPDATE_CMD="sudo yum update -y"
+  else
+    echo -e "${RED}❌ Unsupported OS.${RESET}"
+    return
+  fi
+
   REQ_PKGS=(curl build-essential git wget lz4 jq make gcc nano automake autoconf tmux htop nvme-cli libgbm1 pkg-config libssl-dev libleveldb-dev tar clang bsdmainutils ncdu unzip ufw ca-certificates gnupg lsb-release)
   MISSING_PKGS=()
   for pkg in "${REQ_PKGS[@]}"; do
@@ -103,9 +97,12 @@ install_and_start_node() {
       MISSING_PKGS+=("$pkg")
     fi
   done
+
   if [[ ${#MISSING_PKGS[@]} -gt 0 ]]; then
-    sudo apt-get update -y &>/dev/null
-    sudo apt-get install -y "${MISSING_PKGS[@]}" &>/dev/null
+    $UPDATE_CMD &>/dev/null &
+    animated_spinner $!
+    $PKG_MANAGER "${MISSING_PKGS[@]}" &>/dev/null &
+    animated_spinner $!
     echo -e "${GREEN}✔ Installed missing packages: ${MISSING_PKGS[*]}.${RESET}"
   else
     echo -e "${GREEN}✔ All required packages are already installed.${RESET}"
