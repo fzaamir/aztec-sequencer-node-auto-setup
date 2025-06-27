@@ -4,17 +4,19 @@ Fully automated deployment & management of an **Aztec Sequencer Node** on **Ubun
 
 ---
 
+
 ## ✨ Features
 
-* 🔧 Auto-installs Docker, Compose & required dependencies
-* 🔐 Configures UFW firewall securely
-* 🌐 Detects and applies your public IP automatically
-* 🧠 Prompts for ETH key, public address, RPC & Beacon URLs
-* 🐳 Runs node in Docker Compose with auto-restart
-* 📊 Fetches L2 block number & sync proof
-* 🧹 Full reset option to wipe and reinitialize
-* 🖥️ Real-time log viewer
-* 📋 Interactive menu for full control
+* 🔧 Automatically installs Docker, Docker Compose, and all required dependencies
+* 🔐 Sets up a secure UFW firewall configuration
+* 🌐 Automatically detects and applies your public IP address
+* 🧠 Prompts for Ethereum private key, public address, RPC, and Beacon URLs
+* 🐳 Runs the node using Docker Compose with auto-restart enabled
+* 🔗 Displays your node's Peer ID
+* 🧹 Includes a full reset option to wipe and reinitialize the environment
+* 🖥️ Provides a real-time log viewer for live monitoring
+* 📋 Offers an interactive menu for complete control
+
 
 ---
 
