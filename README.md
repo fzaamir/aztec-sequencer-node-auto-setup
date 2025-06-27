@@ -43,11 +43,12 @@ bash <(curl -s https://raw.githubusercontent.com/fzaamir/aztec-sequencer-node-au
 ## 🧪 Interactive Menu Options
 
 ```
-1️⃣  Install & Start Node
-2️⃣  Get Latest Block + Sync Proof
+1️⃣  Install and Launch Node
+2️⃣  Get Peer ID
 3️⃣  View Real-Time Logs
-4️⃣  Full Reset (wipe everything)
+4️⃣  Perform Full Reset
 5️⃣  Exit
+
 ```
 
 ---
