@@ -75,11 +75,13 @@ fetch_peer_id() {
   echo -e "${CYAN}🔍 Fetching Peer ID...${RESET}"
   local peerid container_id label peerline line width
 
+  # 1. Try container named 'aztec' with DiscV5 log
   peerid=$(sudo docker logs $(docker ps -q --filter "name=aztec" | head -1) 2>&1 \
     | grep -m 1 -ai 'DiscV5 service started' \
     | grep -o '"peerId":"[^"]*"' \
     | cut -d'"' -f4)
 
+  # 2. Fallback: any running container with aztec image
   if [ -z "$peerid" ]; then
     container_id=$(sudo docker ps --filter "ancestor=$(sudo docker images --format '{{.Repository}}:{{.Tag}}' | grep aztec | head -1)" -q | head -1)
     if [ -n "$container_id" ]; then
@@ -90,6 +92,7 @@ fetch_peer_id() {
     fi
   fi
 
+  # 3. Last resort: any peerId entry in aztec container
   if [ -z "$peerid" ]; then
     peerid=$(sudo docker logs $(docker ps -q --filter "name=aztec" | head -1) 2>&1 \
       | grep -m 1 -ai '"peerId"' \
@@ -114,6 +117,7 @@ fetch_peer_id() {
 
   read -n1 -s -r -p "Press any key to return to the menu."
 }
+
 
 animated_spinner() {
   local pid=$1
