@@ -186,11 +186,12 @@ main_menu() {
   while true; do
     clear
     draw_banner
-    echo -e "\n${CYAN}${BOLD}1) 📦 Install & Start Node${RESET}"
-    echo -e "${CYAN}${BOLD}2) 🔗 Show Peer ID${RESET}"
-    echo -e "${CYAN}${BOLD}3) 📄 View Logs${RESET}"
-    echo -e "${CYAN}${BOLD}4) 🧹 Full Reset${RESET}"
-    echo -e "${CYAN}${BOLD}5) ❌ Exit${RESET}"
+    echo -e "\n${CYAN}${BOLD}1) 📦  Install and Launch Node${RESET}"
+    echo -e "${CYAN}${BOLD}2) 🔗  Get Peer ID${RESET}"
+    echo -e "${CYAN}${BOLD}3) 📄  View Node Logs${RESET}"
+    echo -e "${CYAN}${BOLD}4) 🧹  Perform Full Reset${RESET}"
+    echo -e "${CYAN}${BOLD}5) ❌  Exit${RESET}"
+
     read -rp "🔀 Choice [1-5]: " CHOICE
     case "$CHOICE" in
       1) install_and_start_node ;;
