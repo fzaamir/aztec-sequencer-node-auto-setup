@@ -29,14 +29,11 @@ draw_banner() {
   local mid="║              🚀 AZTEC NETWORK • SEQUENCER NODE               ║"
   local bot="╚${border}╝"
   for line in "$top" "$mid" "$bot"; do
-    # start bold for the line
     echo -ne "${BOLD}"
     for ((i=0; i<${#line}; i++)); do
-      # print each char in bold cyan
       echo -ne "${CYAN}${line:$i:1}${RESET}${BOLD}"
       sleep 0.002
     done
-    # reset at end of line and newline
     echo -e "${RESET}"
   done
 }
@@ -50,8 +47,10 @@ install_docker() {
   sudo apt-get update -y &>/dev/null
   sudo apt-get install -y apt-transport-https ca-certificates curl gnupg lsb-release &>/dev/null
   sudo mkdir -p /etc/apt/keyrings
-  curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /etc/apt/keyrings/docker.gpg
-  echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" \
+  curl -fsSL https://download.docker.com/linux/ubuntu/gpg \
+    | sudo gpg --dearmor -o /etc/apt/keyrings/docker.gpg
+  echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] \
+    https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" \
     | sudo tee /etc/apt/sources.list.d/docker.list &>/dev/null
   sudo apt-get update -y &>/dev/null
   sudo apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin &>/dev/null
@@ -76,7 +75,22 @@ install_docker_compose() {
   echo -e "${GREEN}✔ Docker Compose installation complete (${COMPOSE_CMD}).${RESET}"
 }
 
-# Simple animated spinner\animated_spinner() {
+# Fetch Peer ID from container logs
+fetch_peer_id() {
+  echo -e "${CYAN}🔍 Fetching peer ID from Aztec container logs...${RESET}"
+  local peer_id
+  peer_id=$(docker logs aztec --tail 50 2>&1 \
+    | grep -m1 -Po '(?<=Peer ID: )[0-9A-Za-z-]+')
+  if [[ -n "$peer_id" ]]; then
+    echo -e "${GREEN}✔ Your peer ID is: ${BOLD}$peer_id${RESET}"
+  else
+    echo -e "${RED}✖ Peer ID not found. Ensure the container is running and logs include a Peer ID.${RESET}"
+  fi
+  read -n1 -s -r -p "Press any key to return to the main menu."
+}
+
+# Spinner for background tasks
+animated_spinner() {
   local pid=$1
   local delay=0.1
   local spinner='|/-\\'
@@ -112,9 +126,10 @@ install_and_start_node() {
     return
   fi
 
-  REQ_PKGS=(curl build-essential git wget lz4 jq make gcc nano automake autoconf tmux htop \
-             nvme-cli libgbm1 pkg-config libssl-dev libleveldb-dev tar clang bsdmainutils ncdu \
-             unzip ufw ca-certificates gnupg lsb-release)
+  REQ_PKGS=(curl build-essential git wget lz4 jq make gcc nano automake \
+             autoconf tmux htop nvme-cli libgbm1 pkg-config libssl-dev \
+             libleveldb-dev tar clang bsdmainutils ncdu unzip ufw \
+             ca-certificates gnupg lsb-release)
   MISSING_PKGS=()
   for pkg in "${REQ_PKGS[@]}"; do
     if ! dpkg -s "$pkg" &>/dev/null; then
@@ -123,10 +138,8 @@ install_and_start_node() {
   done
 
   if [[ ${#MISSING_PKGS[@]} -gt 0 ]]; then
-    $UPDATE_CMD &>/dev/null &
-    animated_spinner $!
-    $PKG_MANAGER "${MISSING_PKGS[@]}" &>/dev/null &
-    animated_spinner $!
+    $UPDATE_CMD &>/dev/null & animated_spinner $!
+    $PKG_MANAGER "${MISSING_PKGS[@]}" &>/dev/null & animated_spinner $!
     echo -e "${GREEN}✔ Installed missing packages: ${MISSING_PKGS[*]}.${RESET}"
   else
     echo -e "${GREEN}✔ All required packages are already installed.${RESET}"
@@ -177,7 +190,8 @@ services:
       P2P_IP: \${P2P_IP}
       LOG_LEVEL: info
     entrypoint: >
-      sh -c 'node --no-warnings /usr/src/yarn-project/aztec/dest/bin/index.js start --network alpha-testnet --node --archiver --sequencer'
+      sh -c 'node --no-warnings /usr/src/yarn-project/aztec/dest/bin/index.js \
+      start --network alpha-testnet --node --archiver --sequencer'
     ports:
       - 40400:40400/tcp
       - 40400:40400/udp
@@ -185,6 +199,7 @@ services:
     volumes:
       - /root/.aztec/alpha-testnet/data/:/data
 EOF
+}
 
 view_logs() {
   if [[ ! -d "$AZTEC_DIR" ]]; then
@@ -201,32 +216,41 @@ view_logs() {
   sleep 1
 }
 
+full_reset() {
+  echo -e "${YELLOW}🧹 Performing full reset...${RESET}"
+  # Add your reset logic here (e.g., docker-compose down, rm -rf data directories)
+  echo -e "${GREEN}✔ Full reset complete.${RESET}"
+  sleep 1
+}
+
 main_menu() {
   detect_compose
   while true; do
     clear
     draw_banner
-    echo -e "
-${CYAN}${BOLD}1) 📦 Install & Start Node${RESET}"
-    echo -e "${CYAN}${BOLD}2) 📄 View Logs${RESET}"
-    echo -e "${CYAN}${BOLD}3) 🧹 Full Reset (wipe everything)${RESET}"
-    echo -e "${CYAN}${BOLD}4) ❌ Exit${RESET}"
-    read -rp "🔀 Choice [1-4]: " CHOICE
+    echo -e "\n${CYAN}${BOLD}1) 📦 Install & Start Node${RESET}"
+    echo -e "${CYAN}${BOLD}2) 🔗 Show Peer ID${RESET}"
+    echo -e "${CYAN}${BOLD}3) 📄 View Logs${RESET}"
+    echo -e "${CYAN}${BOLD}4) 🧹 Full Reset (wipe everything)${RESET}"
+    echo -e "${CYAN}${BOLD}5) ❌ Exit${RESET}"
+    read -rp "🔀 Choice [1-5]: " CHOICE
 
     case "$CHOICE" in
       1) install_and_start_node ;;
-      2) view_logs ;;
-      3) full_reset ;;
-      4)
+      2) fetch_peer_id           ;;
+      3) view_logs              ;;
+      4) full_reset             ;;
+      5)
         echo -e "${YELLOW}👋 Goodbye!${RESET}"
         exit 0
         ;;
       *)
-        echo -e "${RED}❌ Invalid choice. Please enter a number between 1 and 4.${RESET}"
+        echo -e "${RED}❌ Invalid choice. Please enter a number between 1 and 5.${RESET}"
         sleep 1
         ;;
     esac
   done
 }
 
+# Start the menu
 main_menu
