@@ -47,10 +47,8 @@ install_docker() {
   sudo apt-get update -y &>/dev/null
   sudo apt-get install -y apt-transport-https ca-certificates curl gnupg lsb-release &>/dev/null
   sudo mkdir -p /etc/apt/keyrings
-  curl -fsSL https://download.docker.com/linux/ubuntu/gpg \
-    | sudo gpg --dearmor -o /etc/apt/keyrings/docker.gpg
-  echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] \
-    https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" \
+  curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /etc/apt/keyrings/docker.gpg
+  echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" \
     | sudo tee /etc/apt/sources.list.d/docker.list &>/dev/null
   sudo apt-get update -y &>/dev/null
   sudo apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin &>/dev/null
@@ -75,16 +73,27 @@ install_docker_compose() {
   echo -e "${GREEN}✔ Docker Compose installation complete (${COMPOSE_CMD}).${RESET}"
 }
 
-# Fetch Peer ID from container logs
+# Fetch Peer ID from the running Aztec container (by image)
 fetch_peer_id() {
-  echo -e "${CYAN}🔍 Fetching peer ID from Aztec container logs...${RESET}"
-  local peer_id
-  peer_id=$(docker logs aztec --tail 50 2>&1 \
-    | grep -m1 -Po '(?<=Peer ID: )[0-9A-Za-z-]+')
-  if [[ -n "$peer_id" ]]; then
-    echo -e "${GREEN}✔ Your peer ID is: ${BOLD}$peer_id${RESET}"
+  echo -e "${CYAN}🔍 Fetching peer ID from running Aztec container...${RESET}"
+  # Find container ID by image ancestor
+  local container
+  container=$(docker ps -q --filter "ancestor=aztecprotocol/aztec:${IMAGE_TAG}" | head -n1)
+  if [[ -z "$container" ]]; then
+    echo -e "${RED}✖ No running container found for image aztecprotocol/aztec:${IMAGE_TAG}.${RESET}"
   else
-    echo -e "${RED}✖ Peer ID not found. Ensure the container is running and logs include a Peer ID.${RESET}"
+    # Extract peerId field from logs
+    local peer_id
+    peer_id=$(sudo docker logs "$container" 2>&1 \
+      | grep -i "peerId" \
+      | grep -o '"peerId":"[^"]*"' \
+      | cut -d '"' -f4 \
+      | head -n1)
+    if [[ -n "$peer_id" ]]; then
+      echo -e "${GREEN}✔ Your peer ID is: ${BOLD}$peer_id${RESET}"
+    else
+      echo -e "${RED}✖ Peer ID not found in logs. Make sure the node has started and logs include peerId.${RESET}"
+    fi
   fi
   read -n1 -s -r -p "Press any key to return to the main menu."
 }
@@ -232,7 +241,7 @@ main_menu() {
     echo -e "${CYAN}${BOLD}2) 🔗 Show Peer ID${RESET}"
     echo -e "${CYAN}${BOLD}3) 📄 View Logs${RESET}"
     echo -e "${CYAN}${BOLD}4) 🧹 Full Reset (wipe everything)${RESET}"
-    echo -e "${CYAN}${BOLD}5) ❌ Exit${RESET}"
+    echo -e "${CY色}${BOLD}5) ❌ Exit${RESET}"
     read -rp "🔀 Choice [1-5]: " CHOICE
 
     case "$CHOICE" in
