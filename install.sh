@@ -47,7 +47,8 @@ install_docker() {
   sudo apt-get update -y &>/dev/null
   sudo apt-get install -y apt-transport-https ca-certificates curl gnupg lsb-release &>/dev/null
   sudo mkdir -p /etc/apt/keyrings
-  curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /etc/apt/keyrings/docker.gpg
+  curl -fsSL https://download.docker.com/linux/ubuntu/gpg \
+    | sudo gpg --dearmor -o /etc/apt/keyrings/docker.gpg
   echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" \
     | sudo tee /etc/apt/sources.list.d/docker.list &>/dev/null
   sudo apt-get update -y &>/dev/null
@@ -89,7 +90,6 @@ fetch_peer_id() {
     echo -e "${RED}✖ Peer ID not found. Ensure the container is running and logs include a peerId field.${RESET}"
   fi
   read -n1 -s -r -p "Press any key to return to the main menu."
-}
 }
 
 # Spinner for background tasks
@@ -235,7 +235,7 @@ main_menu() {
     echo -e "${CYAN}${BOLD}2) 🔗 Show Peer ID${RESET}"
     echo -e "${CYAN}${BOLD}3) 📄 View Logs${RESET}"
     echo -e "${CYAN}${BOLD}4) 🧹 Full Reset (wipe everything)${RESET}"
-    echo -e "${CY色}${BOLD}5) ❌ Exit${RESET}"
+    echo -e "${CYAN}${BOLD}5) ❌ Exit${RESET}"
     read -rp "🔀 Choice [1-5]: " CHOICE
 
     case "$CHOICE" in
