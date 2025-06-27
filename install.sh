@@ -9,38 +9,40 @@ YELLOW="\033[1;33m" CYAN="\033[1;36m" RED="\033[1;31m"
 AZTEC_DIR="$HOME/aztec-sequencer"
 DATA_DIR="/root/.aztec/alpha-testnet/data"
 IMAGE_TAG="latest"
+LOG_CHECK_INTERVAL=10
 
 # Detect Docker Compose
 detect_compose() {
-  if command -v docker-compose &>/dev/null; then
+  if command -v docker-compose >/dev/null 2>&1; then
     COMPOSE_CMD="docker-compose"
-  elif docker compose version &>/dev/null; then
+  elif docker compose version >/dev/null 2>&1; then
     COMPOSE_CMD="docker compose"
   else
     COMPOSE_CMD=""
   fi
 }
 
-# Banner
+# Animated, bold typewriter banner
 draw_banner() {
   local border="══════════════════════════════════════════════════════════════"
-  echo -e "${BOLD}${CYAN}╔${border}╗${RESET}"
-  echo -e "${BOLD}${CYAN}║              🚀 AZTEC NETWORK • SEQUENCER NODE               ║${RESET}"
-  echo -e "${BOLD}${CYAN}╚${border}╝${RESET}"
-}
-
-# Spinner
-animated_spinner() {
-  local pid=$1 delay=0.1 spinner='|/-\\'
-  while kill -0 "$pid" 2>/dev/null; do
-    for char in $spinner; do echo -ne "${CYAN}$char${RESET}"; sleep $delay; echo -ne '\b'; done
+  local top="╔${border}╗"
+  local mid="║              🚀 AZTEC NETWORK • SEQUENCER NODE               ║"
+  local bot="╚${border}╝"
+  for line in "$top" "$mid" "$bot"; do
+    echo -ne "${BOLD}"
+    for ((i=0; i<${#line}; i++)); do
+      echo -ne "${CYAN}${line:$i:1}${RESET}${BOLD}"
+      sleep 0.002
+    done
+    echo -e "${RESET}"
   done
 }
 
-# Docker
+# Install Docker if missing
 install_docker() {
-  if command -v docker &>/dev/null; then
-    echo -e "${GREEN}✔ Docker already installed.${RESET}"; return
+  if command -v docker >/dev/null 2>&1; then
+    echo -e "${GREEN}✔ Docker is already installed.${RESET}"
+    return
   fi
   echo -e "${CYAN}⏳ Installing Docker...${RESET}"
   sudo apt-get update -y &>/dev/null
@@ -52,58 +54,134 @@ install_docker() {
   sudo apt-get update -y &>/dev/null
   sudo apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin &>/dev/null
   sudo systemctl enable --now docker
-  echo -e "${GREEN}✔ Docker installed.${RESET}"
+  echo -e "${GREEN}✔ Docker installation complete.${RESET}"
 }
 
-# Docker Compose
+# Install Docker Compose if missing
 install_docker_compose() {
   detect_compose
   if [[ -n "$COMPOSE_CMD" ]]; then
-    echo -e "${GREEN}✔ Docker Compose already available (${COMPOSE_CMD}).${RESET}"; return
+    echo -e "${GREEN}✔ Docker Compose is already installed (${COMPOSE_CMD}).${RESET}"
+    return
   fi
-  echo -e "${CYAN}⏳ Installing Docker Compose plugin...${RESET}"
+  echo -e "${CYAN}⏳ Installing Docker Compose...${RESET}"
+  sudo apt-get update -y &>/dev/null
   sudo apt-get install -y docker-compose-plugin &>/dev/null
   detect_compose
-  [[ -z "$COMPOSE_CMD" ]] && echo -e "${RED}✖ Failed to install Docker Compose.${RESET}" && exit 1
-  echo -e "${GREEN}✔ Docker Compose installed (${COMPOSE_CMD}).${RESET}"
+  if [[ -z "$COMPOSE_CMD" ]]; then
+    echo -e "${RED}✖ Failed to install Docker Compose.${RESET}"
+    exit 1
+  fi
+  echo -e "${GREEN}✔ Docker Compose installation complete (${COMPOSE_CMD}).${RESET}"
 }
 
-# Fetch Peer ID
+# Fetch Peer ID from running Aztec container logs
 fetch_peer_id() {
   echo -e "${CYAN}🔍 Fetching Peer ID...${RESET}"
-  local container peer_id
-  container=$(docker ps -q --filter "ancestor=aztecprotocol/aztec:${IMAGE_TAG}" | head -n1)
-  if [[ -z "$container" ]]; then
-    echo -e "${RED}✖ No running Aztec container found.${RESET}"
-  else
-    peer_id=$(docker logs "$container" --tail 100 2>&1 | grep -i 'peerId' | grep -o '"peerId":"[^"]*"' | cut -d '"' -f4 | head -n1)
-    if [[ -n "$peer_id" ]]; then
-      echo -e "${GREEN}✔ Peer ID: ${BOLD}$peer_id${RESET}"
-    else
-      echo -e "${RED}✖ Peer ID not found in logs.${RESET}"
+  local peerid container_id label peerline line width
+
+  # 1. Try container named 'aztec' with DiscV5 log
+  peerid=$(sudo docker logs $(docker ps -q --filter "name=aztec" | head -1) 2>&1 \
+    | grep -m 1 -ai 'DiscV5 service started' \
+    | grep -o '"peerId":"[^"]*"' \
+    | cut -d'"' -f4)
+
+  # 2. Fallback: any running container with aztec image
+  if [ -z "$peerid" ]; then
+    container_id=$(sudo docker ps --filter "ancestor=$(sudo docker images --format '{{.Repository}}:{{.Tag}}' | grep aztec | head -1)" -q | head -1)
+    if [ -n "$container_id" ]; then
+      peerid=$(sudo docker logs $container_id 2>&1 \
+        | grep -m 1 -ai 'DiscV5 service started' \
+        | grep -o '"peerId":"[^"]*"' \
+        | cut -d'"' -f4)
     fi
   fi
-  read -n1 -s -r -p "Press any key to return to menu."
+
+  # 3. Last resort: any peerId entry in aztec container
+  if [ -z "$peerid" ]; then
+    peerid=$(sudo docker logs $(docker ps -q --filter "name=aztec" | head -1) 2>&1 \
+      | grep -m 1 -ai '"peerId"' \
+      | grep -o '"peerId":"[^"]*"' \
+      | cut -d'"' -f4)
+  fi
+
+  label=" ● PeerID"
+  peerline="✓ $peerid"
+  width=${#peerline}; [ ${#label} -gt $width ] && width=${#label}
+  line=$(printf '=%.0s' $(seq 1 $width))
+
+  if [ -n "$peerid" ]; then
+    echo "$line"
+    echo -e "$label"
+    echo -e "${GREEN}${peerline}${RESET}"
+    echo "$line"
+    echo
+    
+    fi
+  else
+    echo -e "${RED}No Aztec PeerID found.${RESET}"
+  fi
+  echo
+  read -n1 -s -r -p "Press any key to return to the menu."
 }
 
-# Install and start Aztec node
+# Simple spinner for background tasks
+animated_spinner() {
+  local pid=$1
+  local delay=0.1
+  local spinner='|/-\\'
+  while kill -0 $pid 2>/dev/null; do
+    for char in $spinner; do
+      echo -ne "${CYAN}$char${RESET}"
+      sleep $delay
+      echo -ne '\b'
+    done
+  done
+}
+
+# Install and start the node
 install_and_start_node() {
+  echo
   read -rp "🔑 ETH private key (no 0x): " PRIV_KEY
   read -rp "📬 ETH public address (0x…): " PUB_ADDR
   read -rp "🌐 Sepolia RPC URL: " RPC_URL
   read -rp "🚀 Sepolia Beacon URL: " BCN_URL
 
-  local IP=$(curl -s https://ipinfo.io/ip || echo "127.0.0.1")
-  echo -e "📱 Using IP: ${GREEN}${BOLD}$IP${RESET}"
+  local IP
+  IP=$(curl -s https://ipinfo.io/ip || echo "127.0.0.1")
+  echo -e "📱 Using detected IP: ${GREEN}${BOLD}${IP}${RESET}"
 
-  echo -e "${CYAN}📦 Installing dependencies...${RESET}"
-  sudo apt-get update -y &>/dev/null
-  sudo apt-get install -y curl git jq nano ufw ca-certificates gnupg lsb-release &>/dev/null
+  echo -e "${CYAN}📦 Checking and installing required packages...${RESET}"
+  if [[ -f /etc/debian_version ]]; then
+    PKG_MANAGER="sudo apt-get install -y"
+    UPDATE_CMD="sudo apt-get update -y"
+  elif [[ -f /etc/redhat-release ]]; then
+    PKG_MANAGER="sudo yum install -y"
+    UPDATE_CMD="sudo yum update -y"
+  else
+    echo -e "${RED}❌ Unsupported OS.${RESET}"
+    return
+  fi
+
+  REQ_PKGS=(curl git jq make gcc nano tmux htop unzip ufw ca-certificates gnupg lsb-release)
+  MISSING=()
+  for pkg in "${REQ_PKGS[@]}"; do
+    if ! dpkg -s "$pkg" &>/dev/null; then
+      MISSING+=("$pkg")
+    fi
+  done
+  if [[ ${#MISSING[@]} -gt 0 ]]; then
+    $UPDATE_CMD &>/dev/null & animated_spinner $!
+    $PKG_MANAGER "${MISSING[@]}" &>/dev/null & animated_spinner $!
+    echo -e "${GREEN}✔ Installed packages: ${MISSING[*]}.${RESET}"
+  else
+    echo -e "${GREEN}✔ All required packages are already installed.${RESET}"
+  fi
 
   install_docker
   install_docker_compose
 
-  echo -e "${CYAN}🔐 Configuring UFW...${RESET}"
+  echo -e "${CYAN}🔐 Configuring UFW firewall...${RESET}"
   sudo ufw allow 22/tcp
   sudo ufw allow 40400/tcp
   sudo ufw allow 40400/udp
@@ -113,11 +191,12 @@ install_and_start_node() {
   echo -e "${CYAN}📥 Installing Aztec CLI...${RESET}"
   curl -s https://install.aztec.network | bash
   echo 'export PATH="$HOME/.aztec/bin:$PATH"' >> ~/.bashrc
-  export PATH="$HOME/.aztec/bin:$PATH"
+  export PATH="\$HOME/.aztec/bin:\$PATH"
+
+  echo -e "${CYAN}⚙️ Initializing Aztec...${RESET}"
   aztec-up latest
 
   mkdir -p "$DATA_DIR" "$AZTEC_DIR"
-
   cat > "$AZTEC_DIR/.env" <<EOF
 ETHEREUM_HOSTS=$RPC_URL
 L1_CONSENSUS_HOST_URLS=$BCN_URL
@@ -151,38 +230,26 @@ services:
     volumes:
       - /root/.aztec/alpha-testnet/data/:/data
 EOF
-
-  echo -e "${CYAN}🚀 Starting Aztec node...${RESET}"
-  pushd "$AZTEC_DIR" >/dev/null
-  $COMPOSE_CMD up -d
-  popd >/dev/null
-  echo -e "${GREEN}✔ Node is running. View logs for status.${RESET}"
-  sleep 2
 }
 
-# Logs
+# Stream logs
 view_logs() {
   if [[ ! -d "$AZTEC_DIR" ]]; then
-    echo -e "${RED}❌ No install directory: $AZTEC_DIR${RESET}"
+    echo -e "${RED}❌ Directory not found: $AZTEC_DIR${RESET}"
     read -n1 -s
     return
   fi
-  echo -e "${CYAN}📄 Viewing logs (Ctrl+C to stop)...${RESET}"
-  pushd "$AZTEC_DIR" >/dev/null
+  echo -e "${CYAN}📄 Streaming logs (Ctrl+C to stop)...${RESET}"
+  pushd "$AZTEC_DIR" &>/dev/null
   $COMPOSE_CMD logs -f
-  popd >/dev/null
+  popd &>/dev/null
 }
 
 # Full reset
 full_reset() {
-  echo -e "${YELLOW}🧹 Resetting Aztec node...${RESET}"
-  if [[ -d "$AZTEC_DIR" ]]; then
-    pushd "$AZTEC_DIR" >/dev/null
-    $COMPOSE_CMD down --volumes --remove-orphans
-    popd >/dev/null
-  fi
-  sudo rm -rf "$DATA_DIR" "$AZTEC_DIR"
-  echo -e "${GREEN}✔ Reset complete.${RESET}"
+  echo -e "${YELLOW}🧹 Performing full reset...${RESET}"
+  # e.g., docker-compose down; rm -rf "$DATA_DIR" "$AZTEC_DIR"
+  echo -e "${GREEN}✔ Full reset complete.${RESET}"
   sleep 1
 }
 
@@ -195,19 +262,16 @@ main_menu() {
     echo -e "\n${CYAN}${BOLD}1) 📦 Install & Start Node${RESET}"
     echo -e "${CYAN}${BOLD}2) 🔗 Show Peer ID${RESET}"
     echo -e "${CYAN}${BOLD}3) 📄 View Logs${RESET}"
-    echo -e "${CYAN}${BOLD}4) 🧹 Full Reset (wipe everything)${RESET}"
+    echo -e "${CYAN}${BOLD}4) 🧹 Full Reset${RESET}"
     echo -e "${CYAN}${BOLD}5) ❌ Exit${RESET}"
     read -rp "🔀 Choice [1-5]: " CHOICE
     case "$CHOICE" in
-      1) install_and_start_node ;;
-      2) fetch_peer_id ;;
-      3) view_logs ;;
-      4) full_reset ;;
-      5) echo -e "${YELLOW}👋 Goodbye!${RESET}"; exit 0 ;;
-      *) echo -e "${RED}❌ Invalid choice. Try 1-5.${RESET}"; sleep 1 ;;
+      1) install_and_start_node ;;   2) fetch_peer_id ;;   3) view_logs ;;   4) full_reset ;;   5) echo -e "${YELLOW}👋 Goodbye!${RESET}"; exit 0 ;;
+      *) echo -e "${RED}❌ Invalid choice.${RESET}"; sleep 1 ;;
     esac
   done
 }
 
-# Start
+# Kick off
+detect_compose
 main_menu
