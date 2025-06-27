@@ -1,39 +1,37 @@
-# ⚡️ Aztec Sequencer Node Installer
+## ⚡ Aztec Sequencer Node Installer
 
 Fully automated deployment & management of an **Aztec Sequencer Node** on **Ubuntu 20.04/22.04**.
 
 ---
 
-
 ## ✨ Features
 
-* 🔧 Automatically installs Docker, Docker Compose, and all required dependencies
-* 🔐 Sets up a secure UFW firewall configuration
+* 🔧 Installs Docker, Docker Compose, and all required dependencies
+* 🔐 Configures a secure UFW firewall
 * 🌐 Automatically detects and applies your public IP address
-* 🧠 Prompts for Ethereum private key, public address, RPC, and Beacon URLs
 * 🐳 Runs the node using Docker Compose with auto-restart enabled
 * 🔗 Displays your node's Peer ID
-* 🧹 Includes a full reset option to wipe and reinitialize the environment
-* 🖥️ Provides a real-time log viewer for live monitoring
-* 📋 Offers an interactive menu for complete control
+* 🧹 Full reset option to wipe and reinitialize the setup
+* 🖥️ Real-time log viewer for live monitoring
+* 📋 Interactive menu for full control
 
 ---
 
-## 📦 Requirements
+## 📦 System Requirements
 
-| Resource     | Minimum                                         |
-| ------------ | ----------------------------------------------- |
-| OS           | Ubuntu 20.04+                                   |
-| CPU          | 8 cores                                         |
-| RAM          | 16 GB                                           |
-| Disk         | 100 GB SSD                                      |
-| Network Keys | Ethereum privkey (no `0x`), RPC URL, Beacon URL |
+| Resource     | Minimum Specification                     |
+| ------------ | ----------------------------------------- |
+| OS           | Ubuntu 20.04 / 22.04                      |
+| CPU          | 8 cores                                   |
+| RAM          | 16 GB                                     |
+| Disk         | 100 GB SSD                                |
+| Network Keys | Ethereum private key, RPC URL, Beacon URL |
 
 ---
 
 ## 🚀 Quick Install
 
-Paste into terminal:
+Paste the following command into your terminal:
 
 ```bash
 bash <(curl -s https://raw.githubusercontent.com/fzaamir/aztec-sequencer-node-auto-setup/main/install.sh)
@@ -49,16 +47,20 @@ bash <(curl -s https://raw.githubusercontent.com/fzaamir/aztec-sequencer-node-au
 3️⃣  View Real-Time Logs
 4️⃣  Perform Full Reset
 5️⃣  Exit
+```
+
 ---
 
 ## 💬 Support
 
-* 💬 [Aztec Discord](https://discord.gg/aztecprotocol) → `#operators`
-* 🛠️ [GitHub Issues](https://github.com/fzaamir/aztec-validator-auto-setup)
+* 💬 [Join the Aztec Discord](https://discord.gg/aztecprotocol) → `#operators` channel
+* 🛠️ [Open an issue on GitHub](https://github.com/fzaamir/aztec-validator-auto-setup)
 
 ---
 
 ### 🛡️ Built for Operators
 
 Minimal. Secure. Resilient.
-Plug it in. Let it run. 🟢
+**Plug it in. Let it run. 🟢**
+
+
