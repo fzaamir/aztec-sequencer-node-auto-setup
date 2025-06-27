@@ -60,53 +60,44 @@ install_docker_compose() {
 }
 
 fetch_peer_id() {
-  echo -e "${CYAN}🔍 Fetching Peer ID...${RESET}"
-  local peerid container_id label peerline line width
+  echo -e "${CYAN}🔍 Checking Aztec container and fetching Peer ID...${RESET}"
 
-  # Try container named 'aztec'
-  container_id=$(docker ps --filter "name=aztec" -q | head -1)
+  local container_id peerid
 
-  # Fallback: any container with aztec image
+  # 1. Find container with name or ancestor match
+  container_id=$(docker ps -q --filter "name=aztec" | head -1)
   if [[ -z "$container_id" ]]; then
-    container_id=$(docker ps --filter "ancestor=$(docker images --format '{{.Repository}}:{{.Tag}}' | grep aztec | head -1)" -q | head -1)
+    container_id=$(docker ps -q --filter "ancestor=$(docker images --format '{{.Repository}}:{{.Tag}}' | grep aztec | head -1)" | head -1)
   fi
 
   if [[ -z "$container_id" ]]; then
-    echo -e "${RED}❌ No running Aztec container found.${RESET}"
+    echo -e "${RED}✖ No running Aztec container found.${RESET}"
     read -n1 -s -r -p "Press any key to return to the menu..."
     return
   fi
 
-  # Attempt multiple log patterns
-  peerid=$(
-    docker logs "$container_id" 2>&1 | grep -m 1 -i 'DiscV5 service started' |
-    grep -o '"peerId":"[^"]*"' | cut -d'"' -f4
-  )
-
-  if [[ -z "$peerid" ]]; then
-    peerid=$(
-      docker logs "$container_id" 2>&1 | grep -m 1 -i '"peerId"' |
-      grep -o '"peerId":"[^"]*"' | cut -d'"' -f4
-    )
-  fi
-
-  label=" ● PeerID"
-  peerline="✓ $peerid"
-  width=${#peerline}; [[ ${#label} -gt $width ]] && width=${#label}
-  line=$(printf '=%.0s' $(seq 1 $width))
+  # 2. Try fetching the peerId
+  peerid=$(docker logs "$container_id" 2>&1 | grep -m 1 -i '"peerId"' | grep -o '"peerId":"[^"]*"' | cut -d'"' -f4)
 
   if [[ -n "$peerid" ]]; then
-    echo "$line"
-    echo -e "$label"
-    echo -e "${GREEN}${peerline}${RESET}"
-    echo "$line"
+    echo
+    echo -e "${GREEN}✔ Peer ID found:${RESET} ${YELLOW}$peerid${RESET}"
     echo
   else
-    echo -e "${RED}❌ Peer ID not found in logs.${RESET}"
+    echo -e "${RED}✖ Peer ID not found in logs.${RESET}"
   fi
 
+  echo -e "${CYAN}🔍 Checking node status...${RESET}"
+  if docker logs "$container_id" 2>&1 | grep -q "Successfully started P2P server"; then
+    echo -e "${GREEN}✔ Node is running and connected to peers.${RESET}"
+  else
+    echo -e "${YELLOW}⚠ Node may not be fully initialized or P2P not ready yet.${RESET}"
+  fi
+
+  echo
   read -n1 -s -r -p "Press any key to return to the menu..."
 }
+
 
 animated_spinner() {
   local pid=$1 delay=0.1 spinner='|/-\\'
