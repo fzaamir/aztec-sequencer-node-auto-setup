@@ -63,27 +63,31 @@ fetch_peer_id() {
   echo -e "${CYAN}🔍 Fetching Peer ID...${RESET}"
   local peerid container_id label peerline line width
 
-  peerid=$(sudo docker logs "$(docker ps -q --filter name=aztec | head -1)" 2>&1 \
-    | grep -m 1 -i 'DiscV5 service started' \
-    | grep -o '"peerId":"[^"]*"' \
-    | cut -d'"' -f4)
+  # Try container named 'aztec'
+  container_id=$(docker ps --filter "name=aztec" -q | head -1)
 
-  if [[ -z "$peerid" ]]; then
-    container_id=$(sudo docker ps --filter ancestor="$(sudo docker images --format '{{.Repository}}:{{.Tag}}' \
-      | grep aztec | head -1)" -q | head -1)
-    if [[ -n "$container_id" ]]; then
-      peerid=$(sudo docker logs "$container_id" 2>&1 \
-        | grep -m 1 -i 'DiscV5 service started' \
-        | grep -o '"peerId":"[^"]*"' \
-        | cut -d'"' -f4)
-    fi
+  # Fallback: any container with aztec image
+  if [[ -z "$container_id" ]]; then
+    container_id=$(docker ps --filter "ancestor=$(docker images --format '{{.Repository}}:{{.Tag}}' | grep aztec | head -1)" -q | head -1)
   fi
 
+  if [[ -z "$container_id" ]]; then
+    echo -e "${RED}❌ No running Aztec container found.${RESET}"
+    read -n1 -s -r -p "Press any key to return to the menu..."
+    return
+  fi
+
+  # Attempt multiple log patterns
+  peerid=$(
+    docker logs "$container_id" 2>&1 | grep -m 1 -i 'DiscV5 service started' |
+    grep -o '"peerId":"[^"]*"' | cut -d'"' -f4
+  )
+
   if [[ -z "$peerid" ]]; then
-    peerid=$(sudo docker logs "$(docker ps -q --filter name=aztec | head -1)" 2>&1 \
-      | grep -m 1 -i '"peerId"' \
-      | grep -o '"peerId":"[^"]*"' \
-      | cut -d'"' -f4)
+    peerid=$(
+      docker logs "$container_id" 2>&1 | grep -m 1 -i '"peerId"' |
+      grep -o '"peerId":"[^"]*"' | cut -d'"' -f4
+    )
   fi
 
   label=" ● PeerID"
@@ -98,10 +102,10 @@ fetch_peer_id() {
     echo "$line"
     echo
   else
-    echo -e "${RED}No Aztec PeerID found.${RESET}"
+    echo -e "${RED}❌ Peer ID not found in logs.${RESET}"
   fi
 
-  read -n1 -s -r -p "Press any key to return to menu..."
+  read -n1 -s -r -p "Press any key to return to the menu..."
 }
 
 animated_spinner() {
