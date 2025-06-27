@@ -76,26 +76,20 @@ install_docker_compose() {
 # Fetch Peer ID from the running Aztec container (by image)
 fetch_peer_id() {
   echo -e "${CYAN}🔍 Fetching peer ID from running Aztec container...${RESET}"
-  # Find container ID by image ancestor
-  local container
-  container=$(docker ps -q --filter "ancestor=aztecprotocol/aztec:${IMAGE_TAG}" | head -n1)
-  if [[ -z "$container" ]]; then
-    echo -e "${RED}✖ No running container found for image aztecprotocol/aztec:${IMAGE_TAG}.${RESET}"
+  # One-liner: detect container and extract peerId
+  local peer_id
+  peer_id=$(sudo docker logs "$(docker ps -q --filter ancestor=aztecprotocol/aztec:${IMAGE_TAG} | head -n 1)" 2>&1 \
+    | grep -i 'peerId' \
+    | grep -o '"peerId":"[^"]*"' \
+    | cut -d '"' -f4 \
+    | head -n 1)
+  if [[ -n "$peer_id" ]]; then
+    echo -e "${GREEN}✔ Your peer ID is: ${BOLD}$peer_id${RESET}"
   else
-    # Extract peerId field from logs
-    local peer_id
-    peer_id=$(sudo docker logs "$container" 2>&1 \
-      | grep -i "peerId" \
-      | grep -o '"peerId":"[^"]*"' \
-      | cut -d '"' -f4 \
-      | head -n1)
-    if [[ -n "$peer_id" ]]; then
-      echo -e "${GREEN}✔ Your peer ID is: ${BOLD}$peer_id${RESET}"
-    else
-      echo -e "${RED}✖ Peer ID not found in logs. Make sure the node has started and logs include peerId.${RESET}"
-    fi
+    echo -e "${RED}✖ Peer ID not found. Ensure the container is running and logs include a peerId field.${RESET}"
   fi
   read -n1 -s -r -p "Press any key to return to the main menu."
+}
 }
 
 # Spinner for background tasks
