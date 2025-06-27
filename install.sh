@@ -62,29 +62,11 @@ install_docker_compose() {
 fetch_peer_id() {
   echo -e "${CYAN}🔍 Fetching Peer ID...${RESET}"
 
-  local container_id peerid
-
-  # Step 1: Try container with name "aztec"
-  container_id=$(docker ps -q --filter "name=aztec" | head -1)
-
-  # Step 2: If not found, try any container with aztec image
-  if [[ -z "$container_id" ]]; then
-    local image=$(docker images --format '{{.Repository}}:{{.Tag}}' | grep aztec | head -1)
-    if [[ -n "$image" ]]; then
-      container_id=$(docker ps -q --filter "ancestor=$image" | head -1)
-    fi
-  fi
-
-  if [[ -z "$container_id" ]]; then
-    echo -e "${RED}❌ No running Aztec container found.${RESET}"
-    read -n1 -s -r -p "Press any key to return to the menu..."
-    return
-  fi
-
-  echo -e "${CYAN}🧠 Using container ID: $container_id${RESET}"
-
-  # Try to get peerId from logs
-  peerid=$(docker logs "$container_id" 2>&1 | grep -i '"peerId"' | grep -o '"peerId":"[^"]*"' | cut -d'"' -f4 | head -1)
+  peerid=$(sudo docker logs $(docker ps -q --filter ancestor=aztecprotocol/aztec:latest | head -n 1) 2>&1 \
+    | grep -i "peerId" \
+    | grep -o '"peerId":"[^"]*"' \
+    | cut -d'"' -f4 \
+    | head -n 1)
 
   if [[ -n "$peerid" ]]; then
     echo -e "\n${GREEN}✔ Peer ID found:${RESET} ${YELLOW}$peerid${RESET}\n"
@@ -92,14 +74,6 @@ fetch_peer_id() {
     echo -e "${RED}❌ Peer ID not found in logs.${RESET}"
   fi
 
-  # Check for P2P activity
-  if docker logs "$container_id" 2>&1 | grep -q "Successfully started P2P server"; then
-    echo -e "${GREEN}✔ Node P2P is active.${RESET}"
-  else
-    echo -e "${YELLOW}⚠ Node P2P not fully started or no log found yet.${RESET}"
-  fi
-
-  echo
   read -n1 -s -r -p "Press any key to return to the menu..."
 }
 
