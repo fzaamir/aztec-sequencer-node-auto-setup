@@ -11,7 +11,6 @@ DATA_DIR="/root/.aztec/alpha-testnet/data"
 IMAGE_TAG="latest"
 LOG_CHECK_INTERVAL=10
 
-# Detect Docker Compose
 detect_compose() {
   if command -v docker-compose >/dev/null 2>&1; then
     COMPOSE_CMD="docker-compose"
@@ -22,7 +21,6 @@ detect_compose() {
   fi
 }
 
-# Animated, bold typewriter banner
 draw_banner() {
   local border="══════════════════════════════════════════════════════════════"
   local top="╔${border}╗"
@@ -38,7 +36,6 @@ draw_banner() {
   done
 }
 
-# Install Docker if missing
 install_docker() {
   if command -v docker >/dev/null 2>&1; then
     echo -e "${GREEN}✔ Docker is already installed.${RESET}"
@@ -57,7 +54,6 @@ install_docker() {
   echo -e "${GREEN}✔ Docker installation complete.${RESET}"
 }
 
-# Install Docker Compose if missing
 install_docker_compose() {
   detect_compose
   if [[ -n "$COMPOSE_CMD" ]]; then
@@ -75,18 +71,15 @@ install_docker_compose() {
   echo -e "${GREEN}✔ Docker Compose installation complete (${COMPOSE_CMD}).${RESET}"
 }
 
-# Fetch Peer ID from running Aztec container logs
 fetch_peer_id() {
   echo -e "${CYAN}🔍 Fetching Peer ID...${RESET}"
   local peerid container_id label peerline line width
 
-  # 1. Try container named 'aztec' with DiscV5 log
   peerid=$(sudo docker logs $(docker ps -q --filter "name=aztec" | head -1) 2>&1 \
     | grep -m 1 -ai 'DiscV5 service started' \
     | grep -o '"peerId":"[^"]*"' \
     | cut -d'"' -f4)
 
-  # 2. Fallback: any running container with aztec image
   if [ -z "$peerid" ]; then
     container_id=$(sudo docker ps --filter "ancestor=$(sudo docker images --format '{{.Repository}}:{{.Tag}}' | grep aztec | head -1)" -q | head -1)
     if [ -n "$container_id" ]; then
@@ -97,7 +90,6 @@ fetch_peer_id() {
     fi
   fi
 
-  # 3. Last resort: any peerId entry in aztec container
   if [ -z "$peerid" ]; then
     peerid=$(sudo docker logs $(docker ps -q --filter "name=aztec" | head -1) 2>&1 \
       | grep -m 1 -ai '"peerId"' \
@@ -116,16 +108,13 @@ fetch_peer_id() {
     echo -e "${GREEN}${peerline}${RESET}"
     echo "$line"
     echo
-    
-    fi
   else
     echo -e "${RED}No Aztec PeerID found.${RESET}"
   fi
-  echo
+
   read -n1 -s -r -p "Press any key to return to the menu."
 }
 
-# Simple spinner for background tasks
 animated_spinner() {
   local pid=$1
   local delay=0.1
@@ -139,7 +128,6 @@ animated_spinner() {
   done
 }
 
-# Install and start the node
 install_and_start_node() {
   echo
   read -rp "🔑 ETH private key (no 0x): " PRIV_KEY
@@ -191,7 +179,7 @@ install_and_start_node() {
   echo -e "${CYAN}📥 Installing Aztec CLI...${RESET}"
   curl -s https://install.aztec.network | bash
   echo 'export PATH="$HOME/.aztec/bin:$PATH"' >> ~/.bashrc
-  export PATH="\$HOME/.aztec/bin:\$PATH"
+  export PATH="$HOME/.aztec/bin:$PATH"
 
   echo -e "${CYAN}⚙️ Initializing Aztec...${RESET}"
   aztec-up latest
@@ -232,7 +220,6 @@ services:
 EOF
 }
 
-# Stream logs
 view_logs() {
   if [[ ! -d "$AZTEC_DIR" ]]; then
     echo -e "${RED}❌ Directory not found: $AZTEC_DIR${RESET}"
@@ -245,15 +232,12 @@ view_logs() {
   popd &>/dev/null
 }
 
-# Full reset
 full_reset() {
   echo -e "${YELLOW}🧹 Performing full reset...${RESET}"
-  # e.g., docker-compose down; rm -rf "$DATA_DIR" "$AZTEC_DIR"
   echo -e "${GREEN}✔ Full reset complete.${RESET}"
   sleep 1
 }
 
-# Main menu
 main_menu() {
   detect_compose
   while true; do
@@ -266,12 +250,15 @@ main_menu() {
     echo -e "${CYAN}${BOLD}5) ❌ Exit${RESET}"
     read -rp "🔀 Choice [1-5]: " CHOICE
     case "$CHOICE" in
-      1) install_and_start_node ;;   2) fetch_peer_id ;;   3) view_logs ;;   4) full_reset ;;   5) echo -e "${YELLOW}👋 Goodbye!${RESET}"; exit 0 ;;
+      1) install_and_start_node ;;
+      2) fetch_peer_id ;;
+      3) view_logs ;;
+      4) full_reset ;;
+      5) echo -e "${YELLOW}👋 Goodbye!${RESET}"; exit 0 ;;
       *) echo -e "${RED}❌ Invalid choice.${RESET}"; sleep 1 ;;
     esac
   done
 }
 
-# Kick off
 detect_compose
 main_menu
