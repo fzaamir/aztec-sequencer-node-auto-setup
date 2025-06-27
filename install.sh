@@ -60,38 +60,43 @@ install_docker_compose() {
 }
 
 fetch_peer_id() {
-  echo -e "${CYAN}🔍 Checking Aztec container and fetching Peer ID...${RESET}"
+  echo -e "${CYAN}🔍 Fetching Peer ID...${RESET}"
 
   local container_id peerid
 
-  # 1. Find container with name or ancestor match
+  # Step 1: Try container with name "aztec"
   container_id=$(docker ps -q --filter "name=aztec" | head -1)
+
+  # Step 2: If not found, try any container with aztec image
   if [[ -z "$container_id" ]]; then
-    container_id=$(docker ps -q --filter "ancestor=$(docker images --format '{{.Repository}}:{{.Tag}}' | grep aztec | head -1)" | head -1)
+    local image=$(docker images --format '{{.Repository}}:{{.Tag}}' | grep aztec | head -1)
+    if [[ -n "$image" ]]; then
+      container_id=$(docker ps -q --filter "ancestor=$image" | head -1)
+    fi
   fi
 
   if [[ -z "$container_id" ]]; then
-    echo -e "${RED}✖ No running Aztec container found.${RESET}"
+    echo -e "${RED}❌ No running Aztec container found.${RESET}"
     read -n1 -s -r -p "Press any key to return to the menu..."
     return
   fi
 
-  # 2. Try fetching the peerId
-  peerid=$(docker logs "$container_id" 2>&1 | grep -m 1 -i '"peerId"' | grep -o '"peerId":"[^"]*"' | cut -d'"' -f4)
+  echo -e "${CYAN}🧠 Using container ID: $container_id${RESET}"
+
+  # Try to get peerId from logs
+  peerid=$(docker logs "$container_id" 2>&1 | grep -i '"peerId"' | grep -o '"peerId":"[^"]*"' | cut -d'"' -f4 | head -1)
 
   if [[ -n "$peerid" ]]; then
-    echo
-    echo -e "${GREEN}✔ Peer ID found:${RESET} ${YELLOW}$peerid${RESET}"
-    echo
+    echo -e "\n${GREEN}✔ Peer ID found:${RESET} ${YELLOW}$peerid${RESET}\n"
   else
-    echo -e "${RED}✖ Peer ID not found in logs.${RESET}"
+    echo -e "${RED}❌ Peer ID not found in logs.${RESET}"
   fi
 
-  echo -e "${CYAN}🔍 Checking node status...${RESET}"
+  # Check for P2P activity
   if docker logs "$container_id" 2>&1 | grep -q "Successfully started P2P server"; then
-    echo -e "${GREEN}✔ Node is running and connected to peers.${RESET}"
+    echo -e "${GREEN}✔ Node P2P is active.${RESET}"
   else
-    echo -e "${YELLOW}⚠ Node may not be fully initialized or P2P not ready yet.${RESET}"
+    echo -e "${YELLOW}⚠ Node P2P not fully started or no log found yet.${RESET}"
   fi
 
   echo
