@@ -17,7 +17,6 @@ Fully automated deployment & management of an **Aztec Sequencer Node** on **Ubun
 * 🖥️ Provides a real-time log viewer for live monitoring
 * 📋 Offers an interactive menu for complete control
 
-
 ---
 
 ## 📦 Requirements
@@ -50,59 +49,6 @@ bash <(curl -s https://raw.githubusercontent.com/fzaamir/aztec-sequencer-node-au
 3️⃣  View Real-Time Logs
 4️⃣  Perform Full Reset
 5️⃣  Exit
-
-```
-
----
-
-## 🔧 Manual Commands
-
-Start node:
-
-```bash
-cd ~/aztec-sequencer && docker compose up -d
-```
-
-Stop node:
-
-```bash
-cd ~/aztec-sequencer && docker compose down
-```
-
-View logs:
-
-```bash
-cd ~/aztec-sequencer && docker compose logs -f
-```
-
-Reset everything:
-
-```bash
-docker compose down -v
-rm -rf ~/aztec-sequencer ~/.aztec/alpha-testnet
-```
-
----
-
-## 📊 Get Block Number & Sync Proof
-
-``` #!/bin/bash
-
-BLOCK=$(curl -s -X POST -H 'Content-Type: application/json' \
-  -d '{"jsonrpc":"2.0","method":"node_getL2Tips","params":[],"id":67}' \
-  http://localhost:8080/ | jq -r '.result.proven.number')
-
-if [[ -z "$BLOCK" || "$BLOCK" == "null" ]]; then
-  echo "❌ Failed to get block number"
-else
-  echo "✅ Block Number: $BLOCK"
-  echo "🔗 Sync Proof:"
-  curl -s -X POST -H 'Content-Type: application/json' \
-    -d "{\"jsonrpc\":\"2.0\",\"method\":\"node_getArchiveSiblingPath\",\"params\":[\"$BLOCK\",\"$BLOCK\"],\"id\":67}" \
-    http://localhost:8080/ | jq -r '.result'
-fi 
-```
-
 ---
 
 ## 💬 Support
