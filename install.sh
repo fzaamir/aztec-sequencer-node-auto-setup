@@ -115,8 +115,10 @@ install_and_start_node() {
   echo 'export PATH="$HOME/.aztec/bin:$PATH"' >> ~/.bashrc
   export PATH="$HOME/.aztec/bin:$PATH"
   aztec-up latest
+  
+  sudo mkdir -p "$DATA_DIR"
+  mkdir -p "$AZTEC_DIR"
 
-  mkdir -p "$DATA_DIR" "$AZTEC_DIR"
 
   cat > "$AZTEC_DIR/.env" <<EOF
 ETHEREUM_HOSTS=$RPC_URL
