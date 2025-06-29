@@ -103,8 +103,12 @@ install_and_start_node() {
   install_docker_compose
 
   echo -e "${CYAN}🔐 Configuring UFW...${RESET}"
-  sudo ufw allow 22/tcp 40400/tcp 40400/udp 8080/tcp
+  sudo ufw allow 22/tcp
+  sudo ufw allow 40400/tcp
+  sudo ufw allow 40400/udp
+  sudo ufw allow 8080/tcp
   sudo ufw --force enable &>/dev/null
+
 
   echo -e "${CYAN}📥 Installing Aztec CLI...${RESET}"
   curl -s https://install.aztec.network | bash
