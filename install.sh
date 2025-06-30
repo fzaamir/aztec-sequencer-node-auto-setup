@@ -77,7 +77,6 @@ fetch_peer_id() {
   read -n1 -s -r -p "Press any key to return to the menu..."
 }
 
-
 animated_spinner() {
   local pid=$1 delay=0.1 spinner='|/-\\'
   while kill -0 "$pid" 2>/dev/null; do
@@ -109,16 +108,14 @@ install_and_start_node() {
   sudo ufw allow 8080/tcp
   sudo ufw --force enable &>/dev/null
 
-
   echo -e "${CYAN}📥 Installing Aztec CLI...${RESET}"
   curl -s https://install.aztec.network | bash
   echo 'export PATH="$HOME/.aztec/bin:$PATH"' >> ~/.bashrc
   export PATH="$HOME/.aztec/bin:$PATH"
   aztec-up latest
-  
+
   sudo mkdir -p "$DATA_DIR"
   mkdir -p "$AZTEC_DIR"
-
 
   cat > "$AZTEC_DIR/.env" <<EOF
 ETHEREUM_HOSTS=$RPC_URL
@@ -161,6 +158,9 @@ EOF
   popd &>/dev/null
   echo -e "${GREEN}✔ Node started.${RESET}"
   sleep 2
+
+  echo -e "\n${GREEN}${BOLD}🎉 Congratulations! You have successfully installed and launched the Aztec node.${RESET}"
+  read -n1 -s -r -p "👉 Press any key to return to the menu..."
 }
 
 view_logs() {
