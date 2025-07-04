@@ -22,7 +22,7 @@ Fully automated deployment & management of an **Aztec Sequencer Node** on **Ubun
 | Resource     | Minimum Specification                     |
 | ------------ | ----------------------------------------- |
 | OS           | Ubuntu 20.04 / 22.04                      |
-| CPU          | 8 cores                                   |
+| CPU          | 4 / 8 cores                                   |
 | RAM          | 16 GB                                     |
 | Disk         | 100 GB SSD                                |
 | Network Keys | Ethereum private key, RPC URL, Beacon URL |
