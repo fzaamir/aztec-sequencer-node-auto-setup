@@ -49,7 +49,7 @@ install_docker() {
 install_docker_compose() {
   detect_compose
   if [[ -n "$COMPOSE_CMD" ]]; then
-    echo -e "${GREEN}✔ Docker Compose already available (${COMPOSE_CMD}).${RESET}"
+    echo -e "${GREEN}✔ Docker Compose available (${COMPOSE_CMD}).${RESET}"
     return
   fi
   echo -e "${CYAN}⏳ Installing Docker Compose plugin...${RESET}"
@@ -77,22 +77,34 @@ fetch_peer_id() {
   read -n1 -s -r -p "Press any key to return to the menu..."
 }
 
-animated_spinner() {
-  local pid=$1 delay=0.1 spinner='|/-\\'
-  while kill -0 "$pid" 2>/dev/null; do
-    for char in $spinner; do echo -ne "${CYAN}$char${RESET}"; sleep $delay; echo -ne '\b'; done
-  done
-}
-
 install_and_start_node() {
-  read -rp "🔑 ETH private key (no 0x): " PRIV_KEY
-  read -rp "📬 ETH public address (0x…): " PUB_ADDR
-  read -rp "🌐 Sepolia RPC URL: " RPC_URL
-  read -rp "🚀 Sepolia Beacon URL: " BCN_URL
+  echo -e "${CYAN}🔧 Validator Configuration:${RESET}"
+  read -rp "❓ Run a single validator or multiple? [single/multiple]: " MODE
 
+  local VALIDATOR_KEYS=""
+  local PUB_ADDR=""
+  local RPC_URL=""
+  local BCN_URL=""
   local IP
   IP=$(curl -s https://ipinfo.io/ip || echo "127.0.0.1")
   echo -e "📱 Using IP: ${GREEN}${BOLD}$IP${RESET}"
+
+  if [[ "$MODE" == "multiple" ]]; then
+    read -rp "🔢 How many validators to run? " NUM
+    for ((i = 1; i <= NUM; i++)); do
+      read -rp "🔑 Validator Private Key #$i (no 0x): " KEY
+      VALIDATOR_KEYS+="0x$KEY"
+      [[ $i -lt $NUM ]] && VALIDATOR_KEYS+=","
+    done
+    read -rp "📬 Publisher wallet address (0x...): " PUB_ADDR
+  else
+    read -rp "🔑 Validator Private Key (no 0x): " KEY
+    VALIDATOR_KEYS="0x$KEY"
+    read -rp "📬 Wallet address (0x...): " PUB_ADDR
+  fi
+
+  read -rp "🌐 Sepolia RPC URL: " RPC_URL
+  read -rp "🚀 Sepolia Beacon URL: " BCN_URL
 
   echo -e "${CYAN}📦 Installing dependencies...${RESET}"
   sudo apt-get update -y &>/dev/null
@@ -112,20 +124,23 @@ install_and_start_node() {
   curl -s https://install.aztec.network | bash
   echo 'export PATH="$HOME/.aztec/bin:$PATH"' >> ~/.bashrc
   export PATH="$HOME/.aztec/bin:$PATH"
-  aztec-up latest
+  aztec-up 1.1.2
 
   sudo mkdir -p "$DATA_DIR"
   mkdir -p "$AZTEC_DIR"
 
-  cat > "$AZTEC_DIR/.env" <<EOF
-ETHEREUM_HOSTS=$RPC_URL
-L1_CONSENSUS_HOST_URLS=$BCN_URL
-VALIDATOR_PRIVATE_KEY=0x$PRIV_KEY
-COINBASE=$PUB_ADDR
-P2P_IP=$IP
-LOG_LEVEL=info
-EOF
+  echo -e "${CYAN}📝 Generating .env file...${RESET}"
+  {
+    echo "ETHEREUM_HOSTS=$RPC_URL"
+    echo "L1_CONSENSUS_HOST_URLS=$BCN_URL"
+    echo "VALIDATOR_PRIVATE_KEYS=$VALIDATOR_KEYS"
+    [[ "$MODE" == "multiple" ]] && echo "PUBLISHER_PRIVATE_KEY=$PUB_ADDR"
+    echo "COINBASE=$PUB_ADDR"
+    echo "P2P_IP=$IP"
+    echo "LOG_LEVEL=info"
+  } > "$AZTEC_DIR/.env"
 
+  echo -e "${CYAN}⚙️ Generating docker-compose.yml...${RESET}"
   cat > "$AZTEC_DIR/docker-compose.yml" <<EOF
 services:
   aztec-node:
@@ -137,10 +152,15 @@ services:
       ETHEREUM_HOSTS: \${ETHEREUM_HOSTS}
       L1_CONSENSUS_HOST_URLS: \${L1_CONSENSUS_HOST_URLS}
       DATA_DIRECTORY: /data
-      VALIDATOR_PRIVATE_KEY: \${VALIDATOR_PRIVATE_KEY}
+      VALIDATOR_PRIVATE_KEYS: \${VALIDATOR_PRIVATE_KEYS}
       COINBASE: \${COINBASE}
       P2P_IP: \${P2P_IP}
       LOG_LEVEL: info
+EOF
+
+  [[ "$MODE" == "multiple" ]] && echo "      PUBLISHER_PRIVATE_KEY: \${PUBLISHER_PRIVATE_KEY}" >> "$AZTEC_DIR/docker-compose.yml"
+
+  cat >> "$AZTEC_DIR/docker-compose.yml" <<EOF
     entrypoint: >
       sh -c 'node --no-warnings /usr/src/yarn-project/aztec/dest/bin/index.js \
         start --network alpha-testnet --node --archiver --sequencer'
@@ -156,10 +176,8 @@ EOF
   pushd "$AZTEC_DIR" &>/dev/null
   $COMPOSE_CMD up -d
   popd &>/dev/null
-  echo -e "${GREEN}✔ Node started.${RESET}"
-  sleep 2
 
-  echo -e "\n${GREEN}${BOLD}🎉 Congratulations! You have successfully installed and launched the Aztec node.${RESET}"
+  echo -e "\n${GREEN}${BOLD}🎉 Aztec node successfully started.${RESET}"
   read -n1 -s -r -p "👉 Press any key to return to the menu..."
 }
 
@@ -176,7 +194,7 @@ view_logs() {
 }
 
 full_reset() {
-  echo -e "${YELLOW}🧹 Full reset...${RESET}"
+  echo -e "${YELLOW}🧹 Performing full reset...${RESET}"
   if [[ -d "$AZTEC_DIR" ]]; then
     pushd "$AZTEC_DIR" &>/dev/null
     $COMPOSE_CMD down --volumes --remove-orphans
