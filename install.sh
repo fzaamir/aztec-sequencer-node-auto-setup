@@ -4,6 +4,7 @@ set -euo pipefail
 BOLD=$(tput bold) RESET=$(tput sgr0)
 GREEN="\033[1;32m" BLUE="\033[1;34m"
 YELLOW="\033[1;33m" CYAN="\033[1;36m" RED="\033[1;31m"
+MAGENTA="\033[1;35m"
 
 AZTEC_DIR="$HOME/aztec-sequencer"
 DATA_DIR="/root/.aztec/alpha-testnet/data"
@@ -20,12 +21,21 @@ detect_compose() {
   fi
 }
 
+require_compose() {
+  detect_compose
+  if [[ -z "$COMPOSE_CMD" ]]; then
+    echo -e "${RED}✖ Docker Compose not found. Choose Install first.${RESET}"
+    read -n1 -s -r -p "Press any key..."
+    return 1
+  fi
+}
+
 install_docker() {
   if command -v docker &>/dev/null; then
     echo -e "${GREEN}✔ Docker is already installed.${RESET}"
     return
   fi
-  echo -e "${CYAN}⏳ Installing Docker...${RESET}"
+  echo -e "${CYAN}⏳ Installing Docker…${RESET}"
   sudo apt-get update -y &>/dev/null
   sudo apt-get install -y apt-transport-https ca-certificates curl gnupg lsb-release &>/dev/null
   sudo mkdir -p /etc/apt/keyrings
@@ -44,7 +54,7 @@ install_docker_compose() {
     echo -e "${GREEN}✔ Docker Compose available (${COMPOSE_CMD}).${RESET}"
     return
   fi
-  echo -e "${CYAN}⏳ Installing Docker Compose plugin...${RESET}"
+  echo -e "${CYAN}⏳ Installing Docker Compose plugin…${RESET}"
   sudo apt-get install -y docker-compose-plugin &>/dev/null
   detect_compose
   [[ -z "$COMPOSE_CMD" ]] && { echo -e "${RED}✖ Docker Compose install failed.${RESET}"; exit 1; }
@@ -70,34 +80,36 @@ draw_banner() {
   local cols
   cols=$(tput cols 2>/dev/null || echo 100)
   echo -e "${BOLD}${CYAN}"
+  print_centered "$cols" "✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨"
   figlet -f big -w "$cols" "AZTEC"
   figlet -f big -w "$cols" "NETWORK"
   echo -e "${RESET}${YELLOW}${BOLD}"
   print_centered "$cols" "🚀 Sequencer Node — Alpha Testnet"
+  echo -e "${MAGENTA}"
+  print_centered "$cols" "⚙️  Managed by this script • 💾 Data persists in $DATA_DIR"
   echo -e "${RESET}"
 }
 
 fetch_peer_id() {
-  echo -e "${CYAN}🔍 Fetching Peer ID...${RESET}"
+  echo -e "${CYAN}🔍 Fetching Peer ID…${RESET}"
   local cid
-  cid=$(docker ps -q --filter "name=aztec" --filter "ancestor=aztecprotocol/aztec:${IMAGE_TAG}" | head -n1)
-  if [[ -z "${cid}" ]]; then
+  cid=$(docker ps -q --filter "name=aztec" | head -n1)
+  if [[ -z "$cid" ]]; then
+    cid=$(docker ps -q --filter "ancestor=aztecprotocol/aztec:${IMAGE_TAG}" | head -n1)
+  fi
+  if [[ -z "$cid" ]]; then
     echo -e "${RED}❌ No running aztec container found.${RESET}"
-    read -n1 -s -r -p "Press any key..."
+    read -n1 -s -r -p "Press any key…"
     return
   fi
   local peerid
-  peerid=$(docker logs "${cid}" 2>&1 \
-    | grep -i "peerId" \
-    | grep -o '"peerId":"[^"]*"' \
-    | cut -d'"' -f4 \
-    | head -n 1 || true)
+  peerid=$(docker logs "$cid" 2>&1 | grep -i '"peerId":"' | grep -o '"peerId":"[^"]*"' | cut -d'"' -f4 | head -n1 || true)
   if [[ -n "${peerid:-}" ]]; then
-    echo -e "\n${GREEN}✔ Peer ID found:${RESET} ${YELLOW}$peerid${RESET}\n"
+    echo -e "\n${GREEN}✔ Peer ID:${RESET} ${YELLOW}$peerid${RESET}\n"
   else
-    echo -e "${RED}❌ Peer ID not found in logs yet.${RESET}"
+    echo -e "${YELLOW}⏳ Peer ID not in logs yet. Try again in a minute.${RESET}"
   fi
-  read -n1 -s -r -p "Press any key..."
+  read -n1 -s -r -p "Press any key…"
 }
 
 install_and_start_node() {
@@ -106,15 +118,17 @@ install_and_start_node() {
   while [[ "$MODE" != "single" && "$MODE" != "multiple" ]]; do
     read -rp "❓ Run a single validator or multiple? [single/multiple]: " MODE
   done
+
   local VALIDATOR_KEYS="" COINBASE_ADDR="" RPC_URL="" BCN_URL="" PUBLISHER_PRIV="" IP
   IP=$(curl -s https://ipinfo.io/ip || echo "127.0.0.1")
-  echo -e "📱 Using IP: ${GREEN}${BOLD}$IP${RESET}"
+  echo -e "📡 Public IP: ${GREEN}${BOLD}$IP${RESET}"
+
   if [[ "$MODE" == "multiple" ]]; then
     local NUM=0
     while ! [[ "$NUM" =~ ^[1-9][0-9]*$ ]]; do
-      read -rp "🔢 How many validators to run? " NUM
+      read -rp "🔢 Number of validators: " NUM
     done
-    for ((i = 1; i <= NUM; i++)); do
+    for ((i=1; i<=NUM; i++)); do
       local KEY=""
       while [[ -z "$KEY" ]]; do
         read -rp "🔑 Validator Private Key #$i (no 0x): " KEY
@@ -132,32 +146,33 @@ install_and_start_node() {
     done
     VALIDATOR_KEYS="0x$KEY"
   fi
-  while [[ -z "$COINBASE_ADDR" ]]; do
-    read -rp "📬 Wallet (coinbase) address (0x...): " COINBASE_ADDR
-  done
-  while [[ -z "$RPC_URL" ]]; do
-    read -rp "🌐 Sepolia RPC URL: " RPC_URL
-  done
-  while [[ -z "$BCN_URL" ]]; do
-    read -rp "🚀 Sepolia Beacon URL: " BCN_URL
-  done
+
+  while [[ -z "$COINBASE_ADDR" ]]; do read -rp "📬 Wallet (coinbase) address (0x…): " COINBASE_ADDR; done
+  while [[ -z "$RPC_URL" ]]; do read -rp "🌐 Sepolia RPC URL: " RPC_URL; done
+  while [[ -z "$BCN_URL" ]]; do read -rp "🚀 Sepolia Beacon URL: " BCN_URL; done
+
   sudo apt-get update -y &>/dev/null
   sudo apt-get install -y curl git jq nano ufw ca-certificates gnupg lsb-release &>/dev/null
   install_docker
   install_docker_compose
+
   sudo ufw allow 22/tcp >/dev/null
   sudo ufw allow 40400/tcp >/dev/null
   sudo ufw allow 40400/udp >/dev/null
   sudo ufw allow 8080/tcp >/dev/null
   sudo ufw --force enable >/dev/null
+
+  echo -e "${CYAN}📥 Installing Aztec CLI…${RESET}"
   curl -s https://install.aztec.network | bash
   if ! grep -q 'export PATH="$HOME/.aztec/bin:$PATH"' ~/.bashrc; then
     echo 'export PATH="$HOME/.aztec/bin:$PATH"' >> ~/.bashrc
   fi
   export PATH="$HOME/.aztec/bin:$PATH"
   aztec-up latest
+
   sudo mkdir -p "$DATA_DIR"
   mkdir -p "$AZTEC_DIR"
+
   {
     echo "ETHEREUM_HOSTS=$RPC_URL"
     echo "L1_CONSENSUS_HOST_URLS=$BCN_URL"
@@ -167,6 +182,7 @@ install_and_start_node() {
     echo "P2P_IP=$IP"
     echo "LOG_LEVEL=info"
   } > "$AZTEC_DIR/.env"
+
   cat > "$AZTEC_DIR/docker-compose.yml" <<EOF
 services:
   aztec-node:
@@ -182,7 +198,13 @@ services:
       COINBASE: \${COINBASE}
       P2P_IP: \${P2P_IP}
       LOG_LEVEL: \${LOG_LEVEL}
-      \${PUBLISHER_PRIVATE_KEY:+PUBLISHER_PRIVATE_KEY=\${PUBLISHER_PRIVATE_KEY}}
+EOF
+
+  if [[ "$MODE" == "multiple" ]]; then
+    printf "      PUBLISHER_PRIVATE_KEY: \${PUBLISHER_PRIVATE_KEY}\n" >> "$AZTEC_DIR/docker-compose.yml"
+  fi
+
+  cat >> "$AZTEC_DIR/docker-compose.yml" <<'EOF'
     entrypoint: >
       sh -c 'node --no-warnings /usr/src/yarn-project/aztec/dest/bin/index.js
         start --network alpha-testnet --node --archiver --sequencer'
@@ -193,47 +215,54 @@ services:
     volumes:
       - /root/.aztec/alpha-testnet/data/:/data
 EOF
+
   pushd "$AZTEC_DIR" >/dev/null
   $COMPOSE_CMD up -d
   popd >/dev/null
-  echo -e "\n${GREEN}${BOLD}🎉 Aztec node successfully started.${RESET}"
-  read -n1 -s -r -p "Press any key..."
+
+  echo -e "\n${GREEN}${BOLD}🎉 Node is live!${RESET} ${CYAN}Use option 3 to view logs.${RESET}"
+  read -n1 -s -r -p "👉 Press any key…"
 }
 
 update_node() {
-  detect_compose
-  if [[ -z "$COMPOSE_CMD" ]]; then
-    echo -e "${RED}❌ Docker Compose is not installed.${RESET}"
-    read -n1 -s -r -p "Press any key..."
-    return
-  fi
+  require_compose || return
   if [[ ! -d "$AZTEC_DIR" ]]; then
-    echo -e "${RED}❌ Install directory not found.${RESET}"
-    read -n1 -s -r -p "Press any key..."
+    echo -e "${RED}❌ Install directory not found: $AZTEC_DIR${RESET}"
+    read -n1 -s -r -p "Press any key…"
     return
   fi
   pushd "$AZTEC_DIR" >/dev/null
+  echo -e "${YELLOW}⛔ Stopping…${RESET}"
   $COMPOSE_CMD down --remove-orphans || true
+  echo -e "${CYAN}⬇️  Pulling latest image…${RESET}"
   $COMPOSE_CMD pull
+  echo -e "${CYAN}🧽 Pruning old layers…${RESET}"
   docker image prune -f >/dev/null || true
+  echo -e "${CYAN}⬆️  Updating Aztec CLI…${RESET}"
+  export PATH="$HOME/.aztec/bin:$PATH"
   aztec-up latest
+  echo -e "${GREEN}▶️  Restarting…${RESET}"
   $COMPOSE_CMD up -d
   popd >/dev/null
   echo -e "${GREEN}✔ Update complete.${RESET}"
-  read -n1 -s -r -p "Press any key..."
+  read -n1 -s -r -p "Press any key…"
 }
 
 view_logs() {
   if [[ ! -d "$AZTEC_DIR" ]]; then
     echo -e "${RED}❌ Install directory missing.${RESET}"
-    read -n1 -s -r -p "Press any key..."
+    read -n1 -s -r -p "Press any key…"
     return
   fi
-  detect_compose
+  require_compose || return
+  echo -e "${CYAN}📜 Streaming logs (Ctrl+C to exit)…${RESET}"
+  pushd "$AZTEC_DIR" >/dev/null
   $COMPOSE_CMD logs -f
+  popd >/dev/null
 }
 
 full_reset() {
+  echo -e "${YELLOW}🧹 Full reset…${RESET}"
   if [[ -d "$AZTEC_DIR" ]]; then
     pushd "$AZTEC_DIR" >/dev/null
     detect_compose
@@ -252,20 +281,20 @@ main_menu() {
   while true; do
     clear
     draw_banner
-    echo -e "\n${CYAN}${BOLD}1) Install and Launch Node${RESET}"
-    echo -e "${CYAN}${BOLD}2) Get Peer ID${RESET}"
-    echo -e "${CYAN}${BOLD}3) View Node Logs${RESET}"
-    echo -e "${CYAN}${BOLD}4) Update to Latest${RESET}"
-    echo -e "${CYAN}${BOLD}5) Full Reset${RESET}"
-    echo -e "${CYAN}${BOLD}6) Exit${RESET}\n"
-    read -rp "Choice [1-6]: " CHOICE
+    echo -e "\n${CYAN}${BOLD}1) 📦 Install & Launch Node${RESET}"
+    echo -e "${CYAN}${BOLD}2) 🔗 Get Peer ID${RESET}"
+    echo -e "${CYAN}${BOLD}3) 📄 View Logs${RESET}"
+    echo -e "${CYAN}${BOLD}4) ⬆️  Update to Latest${RESET}"
+    echo -e "${CYAN}${BOLD}5) 🧹 Full Reset${RESET}"
+    echo -e "${CYAN}${BOLD}6) ❌ Exit${RESET}\n"
+    read -rp "🔀 Choice [1-6]: " CHOICE
     case "$CHOICE" in
       1) install_and_start_node ;;
       2) fetch_peer_id ;;
       3) view_logs ;;
       4) update_node ;;
       5) full_reset ;;
-      6) exit 0 ;;
+      6) echo -e "${YELLOW}👋 Bye!${RESET}"; exit 0 ;;
       *) echo -e "${RED}❌ Invalid choice.${RESET}"; sleep 1 ;;
     esac
   done
