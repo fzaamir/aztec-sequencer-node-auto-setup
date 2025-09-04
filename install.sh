@@ -8,7 +8,7 @@ YELLOW="\033[1;33m" CYAN="\033[1;36m" RED="\033[1;31m"
 
 AZTEC_DIR="$HOME/aztec-sequencer"
 DATA_DIR="/root/.aztec/alpha-testnet/data"
-IMAGE_TAG="latest"
+IMAGE_TAG="1.2.1"
 
 detect_compose() {
   if command -v docker-compose &>/dev/null; then
