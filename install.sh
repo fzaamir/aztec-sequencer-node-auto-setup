@@ -124,7 +124,7 @@ install_and_start_node() {
   curl -s https://install.aztec.network | bash
   echo 'export PATH="$HOME/.aztec/bin:$PATH"' >> ~/.bashrc
   export PATH="$HOME/.aztec/bin:$PATH"
-  aztec-up 1.1.2
+  aztec-up 1.2.1
 
   sudo mkdir -p "$DATA_DIR"
   mkdir -p "$AZTEC_DIR"
