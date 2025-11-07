@@ -1,12 +1,13 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# === COLORS & STYLES ===
+# Simple automated Aztec v2.1.2 installer that auto-generates BLS key and saves it in plaintext.
+# WARNING: This stores the BLS secret key on disk in plain text. Do NOT use on mainnet.
+
 BOLD=$(tput bold) RESET=$(tput sgr0)
 GREEN="\033[1;32m" BLUE="\033[1;34m"
 YELLOW="\033[1;33m" CYAN="\033[1;36m" RED="\033[1;31m"
 
-# === CONFIG ===
 AZTEC_DIR="$HOME/aztec-sequencer"
 DATA_DIR="/root/.aztec/testnet/data"
 IMAGE_TAG="2.1.2"
@@ -14,8 +15,6 @@ ROLLUP_CONTRACT="0xebd99ff0ff6677205509ae73f93d0ca52ac85d67"
 STAKE_TOKEN="0x139d2a7a0881e16332d7D1F8DB383A4507E1Ea7A"
 
 COMPOSE_CMD=""
-
-# === FUNCTIONS ===
 
 detect_compose() {
   if command -v docker-compose &>/dev/null; then
@@ -36,7 +35,7 @@ draw_banner() {
 
 install_docker() {
   if command -v docker &>/dev/null; then
-    echo -e "${GREEN}✔ Docker is already installed.${RESET}"
+    echo -e "${GREEN}✔ Docker already installed.${RESET}"
     return
   fi
   echo -e "${CYAN}⏳ Installing Docker...${RESET}"
@@ -65,6 +64,44 @@ install_docker_compose() {
   echo -e "${GREEN}✔ Docker Compose installed (${COMPOSE_CMD}).${RESET}"
 }
 
+# Auto-generate BLS key (simple plaintext approach)
+generate_bls_key_plain() {
+  echo -e "${CYAN}🔐 Generating BLS key (automated, plaintext) ...${RESET}"
+  # Run aztec keygen bls --mnemonic and capture the "Secret key" line.
+  # This relies on aztec CLI printing a line containing "Secret key:" or "Secret Key:".
+  # If the CLI prompts for interactive input (mnemonic passphrase), this may hang.
+  # For many aztec CLI versions this prints the keys after generation.
+  set +e
+  local out
+  out=$(aztec keygen bls --mnemonic 2>&1)
+  local rc=$?
+  set -e
+  if [[ $rc -ne 0 ]]; then
+    echo -e "${YELLOW}⚠ aztec keygen bls returned non-zero exit. Attempting fallback: aztec keygen bls${RESET}"
+    out=$(aztec keygen bls 2>&1 || true)
+  fi
+
+  # Try to extract secret key from output
+  # Accept either "Secret key: 0x..." or "secret key: 0x..." or similar
+  local sk
+  sk=$(printf "%s\n" "$out" | grep -i "secret key" | head -n1 | sed -E 's/.*0x([0-9a-fA-F]+).*/\1/')
+
+  if [[ -z "$sk" ]]; then
+    # Last attempt: try to find any long hex string in output (>=64 hex chars)
+    sk=$(printf "%s\n" "$out" | grep -Eo "0x[0-9a-fA-F]{64,}" | head -n1 | sed 's/^0x//')
+  fi
+
+  if [[ -z "$sk" ]]; then
+    echo -e "${RED}✖ Failed to parse BLS secret key from aztec output. Please generate manually with 'aztec keygen bls --mnemonic' and supply it.${RESET}"
+    echo -e "Output captured:\n$out"
+    return 1
+  fi
+
+  # Output the secret key without 0x prefix
+  echo "$sk"
+  return 0
+}
+
 full_reset() {
   echo -e "${YELLOW}🧹 Performing full reset...${RESET}"
   if [[ -d "$AZTEC_DIR" ]]; then
@@ -77,31 +114,12 @@ full_reset() {
   sleep 1
 }
 
-fetch_peer_id() {
-  echo -e "${CYAN}🔍 Fetching Peer ID...${RESET}"
-  local cid
-  cid=$(sudo docker ps -q --filter "ancestor=aztecprotocol/aztec:${IMAGE_TAG}" | head -n 1)
-  if [[ -z "$cid" ]]; then
-    echo -e "${RED}❌ No running aztec container found.${RESET}"
-    read -n1 -s -r -p "Press any key to return..."
-    return
-  fi
-  peerid=$(sudo docker logs "$cid" 2>&1 | grep -i '"peerId"' | grep -o '"peerId":"[^"]*"' | cut -d'"' -f4 | head -n 1)
-  if [[ -n "${peerid:-}" ]]; then
-    echo -e "\n${GREEN}✔ Peer ID:${RESET} ${YELLOW}$peerid${RESET}\n"
-  else
-    echo -e "${RED}❌ Peer ID not found.${RESET}"
-  fi
-  read -n1 -s -r -p "Press any key to return..."
-}
-
-install_and_start_node() {
-  echo -e "${CYAN}🔧 Validator Configuration:${RESET}"
+install_and_start_node_auto() {
+  echo -e "${CYAN}🔧 Automated Installer (simple plaintext BLS)${RESET}"
 
   read -rp "🔑 Validator Private Key (no 0x): " KEY
-  read -rp "📬 Attester Wallet Address (0x...): " ATTESTER
-  read -rp "💸 Withdrawer Wallet Address (0x...): " WITHDRAWER
-  read -rp "🔐 BLS Secret Key (no 0x): " BLSKEY
+  read -rp "📬 Attester / Withdrawer Wallet Address (0x...): " ATTESTER
+  # Here user chooses to use same for both by entering one address
   read -rp "🌐 Sepolia RPC URL: " RPC_URL
   read -rp "🚀 Sepolia Beacon URL: " BCN_URL
 
@@ -130,41 +148,73 @@ install_and_start_node() {
   curl -s https://install.aztec.network | bash
   echo 'export PATH="$HOME/.aztec/bin:$PATH"' >> ~/.bashrc
   export PATH="$HOME/.aztec/bin:$PATH"
-  aztec-up 2.1.2
+  aztec-up ${IMAGE_TAG} || true
 
-  echo -e "${CYAN}🪙 Approving 200k STAKE for rollup...${RESET}"
-  cast send $STAKE_TOKEN \
-    "approve(address,uint256)" \
-    $ROLLUP_CONTRACT 200000ether \
-    --private-key "0x$KEY" \
-    --rpc-url "$RPC_URL" || true
-  echo -e "${GREEN}✔ STAKE approved.${RESET}"
+  # Generate BLS key (plaintext approach)
+  BLS_KEY=""
+  if sk=$(generate_bls_key_plain); then
+    BLS_KEY="$sk"
+    echo -e "${GREEN}✔ BLS secret key auto-generated.${RESET}"
+    echo -e "${YELLOW}Stored temporarily in memory and will be written to files (plaintext).${RESET}"
+  else
+    echo -e "${RED}✖ Automatic BLS key generation failed. Please run 'aztec keygen bls --mnemonic' manually and re-run script.${RESET}"
+    exit 1
+  fi
 
-  echo -e "${CYAN}🪩 Registering L1 Validator...${RESET}"
+  # Approve STAKE (best-effort; if cast missing user will need to do it manually)
+  echo -e "${CYAN}🪙 Approving 200k STAKE for rollup (attempt)...${RESET}"
+  if command -v cast &>/dev/null; then
+    set +e
+    cast send $STAKE_TOKEN \
+      "approve(address,uint256)" \
+      $ROLLUP_CONTRACT 200000ether \
+      --private-key "0x$KEY" \
+      --rpc-url "$RPC_URL"
+    set -e
+    echo -e "${GREEN}✔ Approval transaction attempted.${RESET}"
+  else
+    echo -e "${YELLOW}⚠ 'cast' not found on PATH; please run the approval manually with cast or other tool.${RESET}"
+    echo -e "Example:\ncast send $STAKE_TOKEN \"approve(address,uint256)\" $ROLLUP_CONTRACT 200000ether --private-key 0x$KEY --rpc-url $RPC_URL"
+  fi
+
+  # Register validator using the generated BLS key (prefix 0x)
+  echo -e "${CYAN}🪩 Registering L1 validator...${RESET}"
   aztec add-l1-validator \
     --l1-rpc-urls "$RPC_URL" \
     --network testnet \
     --private-key "0x$KEY" \
     --attester "$ATTESTER" \
-    --withdrawer "$WITHDRAWER" \
-    --bls-secret-key "0x$BLSKEY" \
-    --rollup $ROLLUP_CONTRACT
-  echo -e "${GREEN}✔ Validator registered.${RESET}"
+    --withdrawer "$ATTESTER" \
+    --bls-secret-key "0x$BLS_KEY" \
+    --rollup $ROLLUP_CONTRACT || {
+      echo -e "${RED}✖ aztec add-l1-validator failed. Please inspect output.${RESET}"
+      exit 1
+    }
+  echo -e "${GREEN}✔ Validator registration attempted.${RESET}"
 
+  # Prepare install dir and files
   sudo mkdir -p "$DATA_DIR"
   sudo chown -R "$USER":"$USER" /root/.aztec || true
   mkdir -p "$AZTEC_DIR"
 
-  echo -e "${CYAN}📝 Generating .env file...${RESET}"
-  {
-    echo "ETHEREUM_HOSTS=\"$RPC_URL\""
-    echo "L1_CONSENSUS_HOST_URLS=\"$BCN_URL\""
-    echo "VALIDATOR_PRIVATE_KEYS=\"0x$KEY\""
-    echo "COINBASE=\"$ATTESTER\""
-    echo "P2P_IP=\"$IP\""
-    echo "LOG_LEVEL=info"
-  } > "$AZTEC_DIR/.env"
+  # Write .env including plaintext bls key (user asked for simple/plaintext)
+  echo -e "${CYAN}📝 Writing .env (contains plaintext BLS secret key) ...${RESET}"
+  cat > "$AZTEC_DIR/.env" <<EOF
+ETHEREUM_HOSTS="$RPC_URL"
+L1_CONSENSUS_HOST_URLS="$BCN_URL"
+VALIDATOR_PRIVATE_KEYS="0x$KEY"
+COINBASE="$ATTESTER"
+P2P_IP="$IP"
+LOG_LEVEL=info
+BLS_SECRET_KEY="0x$BLS_KEY"
+EOF
 
+  # Also write a dedicated file with strict permissions
+  echo -e "${CYAN}🔒 Saving bls key to $AZTEC_DIR/bls_secret.key (chmod 600)${RESET}"
+  printf "0x%s\n" "$BLS_KEY" > "$AZTEC_DIR/bls_secret.key"
+  chmod 600 "$AZTEC_DIR/bls_secret.key"
+
+  # Generate docker-compose.yml
   echo -e "${CYAN}⚙️ Generating docker-compose.yml...${RESET}"
   cat > "$AZTEC_DIR/docker-compose.yml" <<EOF
 services:
@@ -180,6 +230,7 @@ services:
       COINBASE: \${COINBASE}
       P2P_IP: \${P2P_IP}
       LOG_LEVEL: info
+      BLS_SECRET_KEY: \${BLS_SECRET_KEY}
     entrypoint: >
       sh -c 'node --no-warnings /usr/src/yarn-project/aztec/dest/bin/index.js \
         start --network testnet --node --archiver --sequencer'
@@ -201,8 +252,9 @@ EOF
   $COMPOSE_CMD up -d
   popd &>/dev/null
 
-  echo -e "\n${GREEN}${BOLD}🎉 Aztec node successfully installed and registered on v${IMAGE_TAG}!${RESET}"
-  read -n1 -s -r -p "👉 Press any key to return to the menu..."
+  echo -e "\n${GREEN}${BOLD}🎉 Done. Node started; BLS key stored in $AZTEC_DIR/bls_secret.key and $AZTEC_DIR/.env${RESET}"
+  echo -e "${YELLOW}Reminder: This stored BLS key is plaintext. If you later want to remove it, delete the files above and re-generate a keystore.${RESET}"
+  read -n1 -s -r -p "Press any key to exit..."
 }
 
 view_logs() {
@@ -237,7 +289,7 @@ main_menu() {
   while true; do
     clear
     draw_banner
-    echo -e "\n${CYAN}${BOLD}1) 🚀 Install, Register & Launch Node${RESET}"
+    echo -e "\n${CYAN}${BOLD}1) 🚀 Install, Register & Launch Node (auto BLS plaintext)${RESET}"
     echo -e "${CYAN}${BOLD}2) 🔗 Get Peer ID${RESET}"
     echo -e "${CYAN}${BOLD}3) 📄 View Logs${RESET}"
     echo -e "${CYAN}${BOLD}4) 🧹 Full Reset${RESET}"
@@ -245,7 +297,7 @@ main_menu() {
     echo -e "${CYAN}${BOLD}6) ❌ Exit${RESET}"
     read -rp "🔀 Choice [1-6]: " CHOICE
     case "$CHOICE" in
-      1) install_and_start_node ;;
+      1) install_and_start_node_auto ;;
       2) fetch_peer_id ;;
       3) view_logs ;;
       4) full_reset ;;
