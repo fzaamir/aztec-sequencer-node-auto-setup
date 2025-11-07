@@ -17,7 +17,7 @@ COMPOSE_CMD=""
 detect_compose() {
   if command -v docker-compose &>/dev/null; then
     COMPOSE_CMD="docker-compose"
-  elif docker compose version &>/dev/null; then
+  elif command -v docker &>/dev/null && docker compose version &>/dev/null 2>&1; then
     COMPOSE_CMD="docker compose"
   else
     COMPOSE_CMD=""
@@ -25,14 +25,18 @@ detect_compose() {
 }
 
 draw_banner() {
-  local border="══════════════════════════════════════════════════════════════"
+  local border="══════════════════════════════════════════════════════════════════════"
   echo -e "${BOLD}${CYAN}╔${border}╗${RESET}"
   echo -e "${BOLD}${CYAN}║      🚀 AZTEC SEQUENCER INSTALLER — v${AZTEC_VERSION}         ║${RESET}"
   echo -e "${BOLD}${CYAN}╚${border}╝${RESET}"
 }
 
 is_wsl() {
-  grep -qi microsoft /proc/version 2>/dev/null || false
+  # Return 0 if running under WSL (Microsoft kernel), otherwise non-zero
+  if grep -qi microsoft /proc/version 2>/dev/null || grep -qi microsoft /proc/sys/kernel/osrelease 2>/dev/null; then
+    return 0
+  fi
+  return 1
 }
 
 install_docker() {
@@ -95,9 +99,24 @@ configure_ufw() {
   echo -e "${GREEN}✔ UFW rules applied.${RESET}"
 }
 
+ensure_jq() {
+  if ! command -v jq &>/dev/null; then
+    echo -e "${YELLOW}jq is required but not found. Attempting to install (APT)...${RESET}"
+    if command -v apt-get &>/dev/null; then
+      sudo apt-get update -y
+      sudo apt-get install -y jq
+    else
+      echo -e "${RED}Please install jq manually and re-run the script.${RESET}"
+      exit 1
+    fi
+  fi
+}
+
 generate_keystore() {
   mkdir -p "$KEYS_DIR"
   echo -e "${CYAN}Generating sequencer keystore (Aztec CLI)...${RESET}"
+  # Ensure jq available for later parsing
+  ensure_jq
   # Allow override via env for non-interactive usage
   FEE_RECIPIENT="${FEE_RECIPIENT:-0x0000000000000000000000000000000000000000000000000000000000000000}"
   MNEMONIC_OPTION=""
@@ -123,7 +142,12 @@ generate_keystore() {
 }
 
 parse_keystore() {
+  ensure_jq
   KEYFILE="$KEYS_DIR/sequencer.json"
+  if [[ ! -f "$KEYFILE" ]]; then
+    echo -e "${RED}✖ Keystore not found at ${KEYFILE}. Run generate_keystore first.${RESET}"
+    exit 1
+  fi
   ATTESTER_ETH=$(jq -r '.validators[0].attester.eth' "$KEYFILE")
   BLS_SECRET=$(jq -r '.validators[0].attester.bls' "$KEYFILE")
   COINBASE=$(jq -r '.validators[0].coinbase' "$KEYFILE")
@@ -206,7 +230,7 @@ services:
     volumes:
       - ${DATA_DIR}:/data
     healthcheck:
-      test: ["CMD","curl","-fsS","http://127.0.0.1:8080/healthz"]
+      test: ["CMD-SHELL","curl -fsS http://127.0.0.1:8080/healthz || exit 1"]
       interval: 30s
       timeout: 5s
       retries: 10
@@ -233,9 +257,13 @@ start_node() {
 }
 
 fetch_peer_id() {
-  cid=$(docker ps -q --filter "ancestor=aztecprotocol/aztec:${IMAGE_TAG}" | head -n1)
+  # Prefer container name; fall back to image ancestor
+  cid=$(docker ps -q --filter "name=aztec" | head -n1 || true)
   if [[ -z "$cid" ]]; then
-    echo -e "${YELLOW}No running aztec container found for image ${IMAGE_TAG}.${RESET}"
+    cid=$(docker ps -q --filter "ancestor=aztecprotocol/aztec:${IMAGE_TAG}" | head -n1 || true)
+  fi
+  if [[ -z "$cid" ]]; then
+    echo -e "${YELLOW}No running aztec container found for image ${IMAGE_TAG} or name 'aztec'.${RESET}"
     return 1
   fi
   peerid=$(docker logs "$cid" 2>&1 | grep -i '"peerId"' | grep -o '"peerId":"[^"]*"' | cut -d'"' -f4 | head -n 1 || true)
