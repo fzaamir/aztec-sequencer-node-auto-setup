@@ -38,7 +38,7 @@ Paste the following in your terminal:
 bash <(curl -s https://raw.githubusercontent.com/fzaamir/aztec-sequencer-node-auto-setup/main/install.sh)
 ```
 
-> 🆕 Compatible with Aztec **v2.1.2** — includes automated key creation and validator registration.
+> 🆕 Compatible with Aztec **v2.1.2** includes automated key creation and validator registration.
 
 ---
 
